@@ -1,0 +1,200 @@
+# IMPLEMENTAÇÃO DA FUNCIONALIDADE DE CHAMADAS COM ELEVENLABS
+
+## VISÃO GERAL
+
+Este documento detalha a implementação da funcionalidade de chamadas telefónicas automatizadas no site chamada.ai, utilizando a API da ElevenLabs para chamadas de saída (outbound calls) via Twilio.
+
+## REQUISITOS
+
+Os requisitos para esta implementação eram:
+- Permitir que os utilizadores inserissem o seu número de telefone
+- Formatar corretamente o número com o prefixo +351 (Portugal)
+- Enviar um pedido para a API da ElevenLabs para iniciar uma chamada
+- Mostrar feedback apropriado ao utilizador sobre o estado da chamada
+- Lidar com erros e exceções de forma adequada
+
+## ARQUITETURA DA SOLUÇÃO
+
+A solução implementada segue uma arquitetura cliente-servidor:
+
+1. **Frontend (Cliente)**:
+   - Componente de entrada de telefone com validação
+   - Interface de utilizador com animações e feedback visual
+   - Comunicação com o backend via fetch API
+
+2. **Backend (Servidor)**:
+   - API Route do Next.js como proxy para a API da ElevenLabs
+   - Processamento e validação do número de telefone
+   - Comunicação segura com a API externa da ElevenLabs
+   - Gestão de erros e respostas
+
+## IMPLEMENTAÇÃO DETALHADA
+
+### 1. Componente Frontend (PhoneInput.tsx)
+
+O componente `PhoneInput` é responsável pela interface de utilizador e pela validação inicial:
+
+```typescript
+// Trecho relevante do PhoneInput.tsx
+const handleSend = async () => {
+  // Reset previous states
+  setError(null);
+  setSuccessMessage(null);
+  
+  // Basic validation
+  const cleanNumber = phone.replace(/[^0-9]/g, '');
+  if (cleanNumber.length < 9) {
+    setIsValid(false);
+    setError('O número deve ter pelo menos 9 dígitos');
+    return;
+  }
+  
+  // Phone number is valid
+  setIsLoading(true);
+  
+  try {
+    // Call our API route that handles the ElevenLabs request
+    const response = await fetch('/api/outbound-call', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ phone: cleanNumber })
+    });
+    
+    // Process response...
+    
+  } catch (err) {
+    // Handle errors...
+  }
+};
+```
+
+Características principais:
+- Validação do formato do número
+- Indicadores visuais de carregamento e sucesso
+- Mensagens de erro claras e informativas
+- Animações de feedback usando Framer Motion
+
+### 2. API Route do Backend (route.ts)
+
+A rota da API atua como um proxy seguro entre o frontend e a ElevenLabs:
+
+```typescript
+// src/app/api/outbound-call/route.ts
+export async function POST(request: NextRequest) {
+  try {
+    // Parse the request body
+    const body = await request.json();
+    
+    // Ensure phone number has the +351 prefix
+    let phoneNumber = body.phone || '';
+    const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
+    
+    const formattedNumber = cleanNumber.startsWith('351') 
+      ? `+${cleanNumber}` 
+      : `+351${cleanNumber}`;
+    
+    // Make a request to ElevenLabs API
+    const response = await fetch('https://api.us.elevenlabs.io/v1/convai/twilio/outbound_call', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer [TOKEN]',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        'agent_id': 'tLYQ1n0EtQQHx8lqbcPT',
+        'agent_phone_number_id': 'EcZm7zeCaXukBOPwwwSN',
+        'to_number': formattedNumber
+      })
+    });
+    
+    // Process response...
+    
+  } catch (error) {
+    // Handle errors...
+  }
+}
+```
+
+Funcionalidades principais:
+- Formatação consistente do número de telefone
+- Gestão de autenticação com a API da ElevenLabs
+- Tratamento de erro robusto
+- Respostas estruturadas para o frontend
+
+## PROBLEMAS ENCONTRADOS E SOLUÇÕES
+
+### 1. Problema: CORS (Cross-Origin Resource Sharing)
+
+**Problema**: Tentativa inicial de chamar diretamente a API da ElevenLabs do frontend resultou em erros de CORS porque o browser bloqueia chamadas cross-origin.
+
+**Solução**: Implementámos uma rota de API no servidor Next.js que atua como proxy, evitando os problemas de CORS. O servidor tem permissão para fazer chamadas para qualquer origem.
+
+### 2. Problema: Formatação de Números de Telefone
+
+**Problema**: Diferentes formatos de entrada de número de telefone (com/sem prefixo internacional, com/sem espaços ou hífens).
+
+**Solução**: Implementámos uma lógica de limpeza e formatação que:
+- Remove todos os caracteres não numéricos
+- Verifica se o número já começa com "351"
+- Adiciona o prefixo "+351" quando necessário
+
+### 3. Problema: Erros de Parsing JSON
+
+**Problema**: Respostas que não eram JSON válido causavam erros no frontend.
+
+**Solução**: Adicionámos tratamento de erro específico para falhas de parsing JSON:
+```typescript
+try {
+  data = await response.json();
+} catch (jsonError) {
+  // Handle JSON parsing errors
+  const text = await response.text();
+  return NextResponse.json(
+    { success: false, error: 'Failed to parse response', text },
+    { status: 500 }
+  );
+}
+```
+
+### 4. Problema: Feedback ao Utilizador
+
+**Problema**: Necessidade de feedback claro e imediato ao utilizador durante o processo de chamada.
+
+**Solução**: Implementámos múltiplos estados visuais:
+- Estado de carregamento durante o processamento
+- Animação de sucesso quando a chamada é iniciada
+- Mensagens detalhadas de erro quando algo falha
+- Aviso de que o utilizador receberá uma chamada real
+
+## CONCLUSÕES E LIÇÕES APRENDIDAS
+
+1. **Arquitetura Cliente-Servidor**: A decisão de utilizar uma API route como proxy provou ser essencial para resolver problemas de CORS e melhorar a segurança.
+
+2. **Validação em Múltiplas Camadas**: Validação tanto no cliente (experiência de utilizador) como no servidor (segurança) ajuda a garantir dados corretos.
+
+3. **Tratamento de Erros Robusto**: Capturar e lidar com erros em cada camada da aplicação é essencial para uma experiência de utilizador estável.
+
+4. **Feedback Visual**: Indicadores claros de estado e animações melhoram significativamente a experiência do utilizador durante operações assíncronas.
+
+## DETALHES TÉCNICOS
+
+- **Framework**: Next.js 13+ com App Router
+- **Estilização**: Tailwind CSS
+- **Animações**: Framer Motion
+- **Endpoints da API**:
+  - Frontend para Backend: `/api/outbound-call` (POST)
+  - Backend para ElevenLabs: `https://api.us.elevenlabs.io/v1/convai/twilio/outbound_call` (POST)
+- **Parâmetros Necessários**:
+  - agent_id: 'tLYQ1n0EtQQHx8lqbcPT'
+  - agent_phone_number_id: 'EcZm7zeCaXukBOPwwwSN'
+  - to_number: número de telefone formatado
+
+## MELHORIAS FUTURAS
+
+1. Armazenamento de histórico de chamadas em base de dados
+2. Implementação de rate limiting para evitar abuso
+3. Análise de estatísticas de sucesso/falha das chamadas
+4. Personalização de mensagens por utilizador
+5. Sistema de agendamento de chamadas 

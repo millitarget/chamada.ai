@@ -1,0 +1,18 @@
+{
+  "name": "elevenlabs-outbound-calling",
+  "version": "1.0.0",
+  "description": "ElevenLabs outbound calling script",
+  "main": "outbound.js",
+  "type": "module",
+  "scripts": {
+    "start": "node outbound.js"
+  },
+  "dependencies": {
+    "@fastify/formbody": "^7.4.0",
+    "@fastify/websocket": "^8.2.0",
+    "dotenv": "^16.3.1",
+    "fastify": "^4.23.2",
+    "twilio": "^4.19.0",
+    "ws": "^8.14.2"
+  }
+} 
