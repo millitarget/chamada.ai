@@ -113,6 +113,11 @@ const HeroSection = () => {
       
       if (!response.ok || !data.success) {
         console.error('API error:', data);
+        // Handle rate limiting specifically
+        if (response.status === 429) {
+          const retryMinutes = data.retryAfter || 60;
+          throw new Error(`Limite de chamadas excedido. Por favor, tente novamente em ${retryMinutes} minutos.`);
+        }
         throw new Error(data?.error || 'Ocorreu um erro ao iniciar a chamada');
       }
       
@@ -182,6 +187,26 @@ const HeroSection = () => {
                 </motion.button>
               </div>
             </div>
+            
+            {error && (
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="mt-2 text-red-500 text-sm"
+              >
+                {error}
+              </motion.p>
+            )}
+            
+            {callSent && (
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="mt-2 text-green-500 text-sm"
+              >
+                Chamada iniciada com sucesso! Atenda o seu telefone em breve.
+              </motion.p>
+            )}
             
             <motion.button 
               onClick={scrollToExamples}
