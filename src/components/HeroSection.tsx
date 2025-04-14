@@ -220,11 +220,11 @@ const HeroSection = () => {
             
             <p className="mt-14 text-zinc-500 text-sm">
               Alimentado por tecnologia de ponta em IA
-            </p>
-          </motion.div>
+          </p>
+        </motion.div>
 
           {/* Right side: AI head visualization */}
-          <motion.div
+        <motion.div
             className="z-10 relative flex justify-center items-center mt-12 lg:mt-0"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -283,9 +283,9 @@ const HeroSection = () => {
                   alt="AI Assistant" 
                   className="object-contain w-full h-full max-w-[200px] sm:max-w-[250px] md:max-w-full drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]"
                 />
-              </motion.div>
+        </motion.div>
             </div>
-          </motion.div>
+      </motion.div>
         </div>
       </div>
       

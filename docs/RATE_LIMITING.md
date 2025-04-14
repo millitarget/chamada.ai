@@ -63,7 +63,68 @@ To test the rate limiting:
 
 If rate limiting isn't working:
 
-1. Make sure your Supabase credentials are correct
-2. Check that the rate_limits table was created successfully
-3. Verify that the SQL migration ran without errors
-4. Look for any console errors in the API route logs 
+### 1. Test Supabase Connection
+
+Run the test endpoint by visiting `/api/test-supabase` in your browser. Check:
+- If Supabase connection is working
+- If the rate_limits table exists
+- If test inserts work
+
+### 2. Check Environment Variables
+
+Make sure your `.env.local` file has the correct Supabase credentials:
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-url.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+You can find these in your Supabase dashboard under Project Settings > API.
+
+### 3. Check SQL Errors
+
+If you get SQL errors when running migrations:
+
+**Error**: `policy already exists`
+- This is because the policy with that name already exists
+- Use the fix script in `supabase/fix_anon_policy.sql` which checks before creating
+
+**Error**: `syntax error at or near "IF NOT EXISTS"`
+- Some PostgreSQL versions in Supabase don't support `IF NOT EXISTS` for policies
+- Use the DO block approach in the fix script
+
+### 4. Create Table Manually
+
+If all else fails, you can create the table manually:
+
+1. Go to Supabase Dashboard > Table Editor
+2. Click "Create a new table"
+3. Set table name to "rate_limits"
+4. Add columns:
+   - id (uuid, primary key)
+   - ip_address (text, unique)
+   - last_call_time (int8)
+   - created_at (timestamptz, default: now())
+   - updated_at (timestamptz, default: now())
+5. Create the table
+6. Go to Authentication > Policies 
+7. Add policies for both anon and service_role
+
+### 5. Check Server Logs
+
+The improved logging in the API route will show:
+- If the connection to Supabase is working
+- If IP address lookup is working
+- If inserts/updates are successful
+
+### 6. Check RLS Policies
+
+If your table exists but you can't insert records, check Row Level Security policies:
+
+1. Go to Authentication > Policies in Supabase
+2. Make sure there's a policy for the "anon" role with INSERT and UPDATE permissions
+3. If not, add it manually with:
+   - Name: "Anon can insert and update rate limits"
+   - Target roles: anon
+   - Policy definition: all operations
+   - Using expression: true
+   - With check expression: true 
