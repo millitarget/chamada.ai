@@ -12,6 +12,17 @@ const HeroSection = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [callSent, setCallSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [dimensions, setDimensions] = useState({ width: 1200, height: 800 });
+
+  // Handle component mount for client-side only code
+  useEffect(() => {
+    setMounted(true);
+    setDimensions({
+      width: window.innerWidth,
+      height: window.innerHeight
+    });
+  }, []);
 
   // Handle window resize for responsive adjustments
   useEffect(() => {
@@ -28,6 +39,13 @@ const HeroSection = () => {
     // Cleanup
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  const scrollToExamples = () => {
+    const examplesSection = document.getElementById('examples-section');
+    if (examplesSection) {
+      examplesSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   const handlePlay = () => {
     const audio = document.getElementById('preview-audio') as HTMLAudioElement;
@@ -118,176 +136,135 @@ const HeroSection = () => {
   };
 
   return (
-    <section className="min-h-screen bg-black relative flex flex-col lg:flex-row items-center justify-center px-4 sm:px-6 py-16 overflow-hidden">
-      {/* Star background effect */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-70">
-        {Array.from({ length: 20 }).map((_, i) => (
-          <div 
-            key={i}
-            className="absolute w-1 h-1 bg-blue-50 rounded-full"
-            style={{
-              top: `${Math.random() * 100}%`,
-              left: `${Math.random() * 100}%`,
-              opacity: Math.random() * 0.6 + 0.2,
-            }}
-          ></div>
-        ))}
-      </div>
-
-      {/* Subtle background glows */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {/* Subtle glow spots */}
-        <div className="absolute top-1/4 left-1/3 w-64 sm:w-96 h-64 sm:h-96 bg-blue-600/5 rounded-full filter blur-[100px]"></div>
-        <div className="absolute bottom-1/3 right-1/3 w-64 sm:w-96 h-64 sm:h-96 bg-blue-600/5 rounded-full filter blur-[100px]"></div>
-      </div>
-
-      {/* Background glow effect */}
-      <div className="fixed top-0 left-0 right-0 h-24 bg-gradient-to-b from-blue-900/10 to-transparent pointer-events-none"></div>
-
-      {/* Left side: Text and buttons section */}
-      <motion.div
-        className="z-10 w-full max-w-xl text-center lg:text-left mr-0 lg:mr-12 mb-12 lg:mb-0"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8 }}
-      >
-        <h1 className="text-white font-bold text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-tight">
-          Um agente de voz.<br />
-          Que soa a humano.
-        </h1>
-        <p className="mt-4 sm:mt-6 text-white text-base sm:text-lg md:text-xl max-w-xl mx-auto lg:mx-0">
-          O futuro das chamadas já começou.
-        </p>
-
-        <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-          <motion.button 
-            onClick={handlePlay}
-            className="bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 px-8 sm:px-10 rounded-full transition flex items-center justify-center gap-2 w-full sm:w-auto"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.98 }}
+    <section className="w-full min-h-screen flex flex-col items-start justify-center px-8 py-16 bg-black">
+      {/* Company logo */}
+      <div className="w-full max-w-6xl mx-auto">
+        <h2 className="text-white font-bold text-4xl mb-16">Chamada.ai</h2>
+        
+        <div className="flex flex-col lg:flex-row justify-between items-center">
+          {/* Left side: Text and buttons section */}
+          <motion.div
+            className="z-10 w-full max-w-2xl"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
           >
-            <HiPlay className="text-white" />
-            Ouça agora
-          </motion.button>
-          
-          {!showPhoneInput ? (
-            <motion.button 
-              onClick={handleCallDemo}
-              className="border border-white/20 text-white font-medium py-3 px-4 sm:px-6 rounded-full hover:bg-white/10 transition w-full sm:w-auto text-sm sm:text-base"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              Receber chamada de demonstração
-            </motion.button>
-          ) : (
-            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <h1 className="text-white font-bold text-4xl sm:text-5xl md:text-6xl leading-tight">
+              O seu novo assistente <br/>telefónico, disponível 24/7.
+            </h1>
+            <p className="mt-6 text-white text-lg md:text-xl max-w-xl">
+              Crie um agente de voz alimentado por IA para sua empresa —
+            </p>
+
+            <p className="mt-12 text-white text-base">
+              Receba uma chamada de demonstração agora:
+            </p>
+
+            <div className="mt-4 flex flex-col sm:flex-row gap-4">
               <div className="flex w-full sm:w-auto">
-                <div className="bg-black text-white border border-zinc-700 py-3 px-3 rounded-l-full text-center flex items-center justify-center">
-                  +351
-                </div>
                 <input
                   type="tel"
-                  placeholder="número"
-                  className="bg-black border border-l-0 border-zinc-700 py-3 px-4 w-full sm:w-32 focus:outline-none focus:border-blue-500 text-white"
+                  placeholder="Insira o seu número"
+                  className="bg-black/50 border border-zinc-800 py-3 px-4 w-full sm:w-80 rounded-l-full focus:outline-none focus:border-blue-500 text-white"
                   value={phoneNumber}
                   onChange={handlePhoneChange}
                   disabled={isLoading || callSent}
-                  maxLength={9}
+                  maxLength={12}
                 />
                 <motion.button
                   onClick={handleCallDemo}
-                  className={`px-4 py-3 rounded-r-full flex items-center justify-center ${
-                    callSent ? 'bg-green-600' : isLoading ? 'bg-zinc-700' : 'bg-blue-600 hover:bg-blue-500'
-                  } text-white`}
-                  whileHover={!isLoading && !callSent ? { scale: 1.05 } : {}}
-                  whileTap={!isLoading && !callSent ? { scale: 0.98 } : {}}
+                  className="bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 px-8 rounded-r-full transition"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.98 }}
                   disabled={isLoading || callSent}
                 >
-                  {callSent ? (
-                    <span>✓</span>
-                  ) : isLoading ? (
-                    <span>...</span>
-                  ) : (
-                    <HiPhone />
-                  )}
+                  Experimente gratis
                 </motion.button>
               </div>
             </div>
-          )}
-        </div>
-        
-        {error && (
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="mt-2 text-red-500 text-sm"
-          >
-            {error}
-          </motion.p>
-        )}
-        
-        {callSent && (
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="mt-2 text-green-500 text-sm"
-          >
-            Chamada iniciada com sucesso! Atenda o seu telefone em breve.
-          </motion.p>
-        )}
-        
-        <audio id="preview-audio" src="/audio/dental.mp3" />
-      </motion.div>
-
-      {/* Right side: AI head visualization */}
-      <motion.div
-        className="z-10 relative flex justify-center items-center"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4, duration: 0.8 }}
-      >
-        {/* AI head */}
-        <div className="relative w-[250px] sm:w-[280px] md:w-[300px] h-[300px] sm:h-[350px] md:h-[400px]">
-          {/* Concentric blue circles */}
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[200px] sm:w-[250px] md:w-[300px] h-[200px] sm:h-[250px] md:h-[300px] rounded-full border border-blue-500/30 animate-pulse"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[170px] sm:w-[210px] md:w-[250px] h-[170px] sm:h-[210px] md:h-[250px] rounded-full border border-blue-500/40 animate-pulse delay-75"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[140px] sm:w-[170px] md:w-[200px] h-[140px] sm:h-[170px] md:h-[200px] rounded-full border border-blue-500/50 animate-pulse delay-150"></div>
-          
-          {/* AI head image */}
-          <div className="relative w-full h-full flex items-center justify-center">
-            <img 
-              src="/images/humanoid.png" 
-              alt="AI Assistant" 
-              className="object-contain w-full h-full max-w-[200px] sm:max-w-[250px] md:max-w-full"
-              onError={(e) => {
-                // Fallback if image doesn't exist
-                e.currentTarget.style.display = 'none';
-                const fallback = document.getElementById('ai-head-fallback');
-                if (fallback) fallback.style.display = 'block';
-              }}
-            />
-            {/* Fallback for the AI head if the image doesn't exist */}
-            <div 
-              id="ai-head-fallback" 
-              className="absolute inset-0 bg-gradient-to-b from-blue-800 to-blue-950 rounded-full hidden"
-              style={{ display: 'none' }}
+            
+            <motion.button 
+              onClick={scrollToExamples}
+              className="mt-10 flex items-center justify-center gap-2 bg-transparent border border-zinc-800 text-white font-medium py-3 px-8 rounded-full hover:bg-white/5 transition w-auto"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.98 }}
             >
-              <div className="w-full h-full flex items-center justify-center">
-                <div className="relative w-32 sm:w-40 h-48 sm:h-60">
-                  <div className="absolute w-full h-3/4 bg-blue-700 rounded-t-full"></div>
-                  <div className="absolute bottom-0 w-full h-1/4 bg-blue-800 rounded-b-full"></div>
-                  <div className="absolute top-1/4 left-1/4 w-1/5 h-1/10 bg-blue-400 rounded-full"></div>
-                  <div className="absolute top-1/4 right-1/4 w-1/5 h-1/10 bg-blue-400 rounded-full"></div>
-                  <div className="absolute top-1/2 left-1/3 w-1/3 h-1/12 bg-blue-500 rounded-full"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+              <span className="text-blue-500 rotate-90">→</span>
+              Ouça agora
+            </motion.button>
+            
+            <p className="mt-14 text-zinc-500 text-sm">
+              Alimentado por tecnologia de ponta em IA
+            </p>
+          </motion.div>
 
-        {/* Gradient glow effect for the AI head on mobile */}
-        <div className="absolute inset-0 bg-blue-600/5 filter blur-3xl rounded-full pointer-events-none"></div>
-      </motion.div>
+          {/* Right side: AI head visualization */}
+          <motion.div
+            className="z-10 relative flex justify-center items-center mt-12 lg:mt-0"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.8 }}
+          >
+            {/* AI head with animated glow */}
+            <div className="relative w-[250px] sm:w-[280px] md:w-[300px] h-[300px] sm:h-[350px] md:h-[400px]">
+              {/* Halo effect */}
+              <motion.div 
+                className="absolute top-12 left-1/2 w-16 h-3 bg-white rounded-full blur-[2px] transform -translate-x-1/2"
+                animate={{ 
+                  opacity: [0.7, 1, 0.7]
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  repeatType: "reverse"
+                }}
+              />
+              
+              {/* Animated glow behind the head */}
+              <motion.div 
+                className="absolute top-1/2 left-1/2 w-[200px] h-[200px] rounded-full bg-blue-900/20 filter blur-[60px]"
+                style={{ x: "-50%", y: "-50%" }}
+                animate={{ 
+                  scale: [1, 1.1, 1],
+                  opacity: [0.3, 0.4, 0.3]
+                }}
+                transition={{
+                  duration: 4,
+                  repeat: Infinity,
+                  repeatType: "reverse"
+                }}
+              />
+              
+              {/* Concentric blue circles */}
+              <motion.div 
+                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[250px] sm:w-[280px] md:w-[320px] h-[250px] sm:h-[280px] md:h-[320px] rounded-full border border-blue-900/30"
+                animate={{ scale: [1, 1.03, 1] }}
+                transition={{ duration: 4, repeat: Infinity, repeatType: "reverse" }}
+              />
+              <motion.div 
+                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[200px] sm:w-[220px] md:w-[250px] h-[200px] sm:h-[220px] md:h-[250px] rounded-full border border-blue-900/40"
+                animate={{ scale: [1, 1.05, 1] }}
+                transition={{ duration: 4, delay: 0.5, repeat: Infinity, repeatType: "reverse" }}
+              />
+              
+              {/* AI head image */}
+              <motion.div 
+                className="relative w-full h-full flex items-center justify-center"
+                animate={{ y: [0, -5, 0] }}
+                transition={{ duration: 4, repeat: Infinity, repeatType: "reverse" }}
+              >
+                <img 
+                  src="/images/humanoid.png" 
+                  alt="AI Assistant" 
+                  className="object-contain w-full h-full max-w-[200px] sm:max-w-[250px] md:max-w-full drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]"
+                />
+              </motion.div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+      
+      <audio id="preview-audio" src="/audio/dental.mp3" />
     </section>
   );
 };

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { FaTooth, FaCut, FaUtensils, FaShoppingCart } from 'react-icons/fa';
 
 type Industry = {
   id: string;
@@ -54,7 +55,7 @@ const ExamplesSection: React.FC = () => {
   };
 
   return (
-    <section className="w-full py-24 px-4">
+    <section id="examples-section" className="w-full py-24 px-4">
       <div className="max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -174,51 +175,22 @@ const industries: Industry[] = [
   {
     id: 'restaurant',
     title: 'Restaurante',
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
-        <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"></path>
-        <path d="M7 2v20"></path>
-        <path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"></path>
-      </svg>
-    ),
+    icon: <FaUtensils className="text-blue-500 w-8 h-8" />
   },
   {
     id: 'dental',
     title: 'Clínica dentária',
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
-        <path d="M12 5.5c-1.5-1-2-2.5-2-3.5 0-1.5.5-2 2-2s2 .5 2 2c0 1-.5 2.5-2 3.5z"></path>
-        <path d="M8.5 8c-1.5-1-2-2.5-2-3.5 0-1.5.5-2 2-2s2 .5 2 2c0 1-.5 2.5-2 3.5z"></path>
-        <path d="M15.5 8c-1.5-1-2-2.5-2-3.5 0-1.5.5-2 2-2s2 .5 2 2c0 1-.5 2.5-2 3.5z"></path>
-        <path d="M12 5.5V22l3.5-3.5"></path>
-        <path d="M8.5 18.5 12 22"></path>
-      </svg>
-    ),
+    icon: <FaTooth className="text-blue-500 w-8 h-8" />
   },
   {
     id: 'salon',
     title: 'Cabeleireiro',
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
-        <path d="M21 9c0 4-1 8-2 11"></path>
-        <path d="M5 9c0 4 1 8 2 11"></path>
-        <path d="M9 6V3"></path>
-        <path d="M15 6V3"></path>
-        <path d="M13 6H5a4 4 0 0 0-4 4c0 1.5.5 2 2 3s2.5 1 2.5 1"></path>
-        <path d="M11 6h8a4 4 0 0 1 4 4c0 1.5-.5 2-2 3s-2.5 1-2.5 1"></path>
-      </svg>
-    ),
+    icon: <FaCut className="text-blue-500 w-8 h-8" />
   },
   {
     id: 'ecommerce',
     title: 'E-commerce',
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
-        <circle cx="8" cy="21" r="1"></circle>
-        <circle cx="19" cy="21" r="1"></circle>
-        <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"></path>
-      </svg>
-    ),
+    icon: <FaShoppingCart className="text-blue-500 w-8 h-8" />
   },
 ];
 
