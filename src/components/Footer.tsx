@@ -15,8 +15,8 @@ const Footer: React.FC = () => {
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
           >
-            <h3 className="text-2xl font-bold text-neon-blue">chamada.ai</h3>
-            <p className="text-gray-400 mt-2">IA que atende por si.</p>
+            <h3 className="text-2xl font-bold text-neon-blue">AI Voice Agent</h3>
+            <p className="text-gray-400 mt-2">Intelligent voice assistant.</p>
           </motion.div>
           
           <motion.div
@@ -75,7 +75,7 @@ const Footer: React.FC = () => {
         
         <div className="border-t border-gray-800 pt-8 text-center">
           <p className="text-gray-500">
-            © {new Date().getFullYear()} chamada.ai — Todos os direitos reservados
+            © {new Date().getFullYear()} AI Voice Agent — All rights reserved
           </p>
         </div>
       </div>
