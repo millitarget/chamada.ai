@@ -89,18 +89,28 @@ export async function POST(request: NextRequest) {
                       request.headers.get('x-real-ip') || 
                       '127.0.0.1';
     
-    // Check if IP is rate limited
-    const [isLimited, remainingSeconds] = await checkRateLimit(ipAddress.split(',')[0]);
+    // Check if rate limiting is enabled (Supabase is configured)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const rateLimit = supabaseUrl && supabaseAnonKey;
     
-    if (isLimited) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Rate limit exceeded', 
-          retryAfter: Math.ceil(remainingSeconds / 60) // Convert to minutes for user-friendly message
-        },
-        { status: 429 }
-      );
+    // Only check rate limit if Supabase is configured
+    if (rateLimit) {
+      // Check if IP is rate limited
+      const [isLimited, remainingSeconds] = await checkRateLimit(ipAddress.split(',')[0]);
+      
+      if (isLimited) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'Rate limit exceeded', 
+            retryAfter: Math.ceil(remainingSeconds / 60) // Convert to minutes for user-friendly message
+          },
+          { status: 429 }
+        );
+      }
+    } else {
+      console.log('Rate limiting disabled - Supabase not configured');
     }
     
     // Parse the request body
