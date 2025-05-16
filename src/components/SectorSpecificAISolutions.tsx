@@ -41,12 +41,12 @@ const sectors: SectorData[] = [
 
 // --- Line Styling Constants ---
 const DEFAULT_LINE_OPACITY = 0.3;
-const DEFAULT_LINE_WIDTH = 1;
+const DEFAULT_LINE_WIDTH = 0.75;
 const ACTIVE_LINE_OPACITY = 1;
-const ACTIVE_LINE_WIDTH = 2;
-const REVEALED_INTERACTION_LINE_WIDTH = 1.5;
+const ACTIVE_LINE_WIDTH = 1.25;
+const REVEALED_INTERACTION_LINE_WIDTH = 1;
 const DIMMED_LINE_OPACITY = 0.1;
-const DIMMED_LINE_WIDTH = 0.75;
+const DIMMED_LINE_WIDTH = 0.5;
 
 const DEFAULT_LINE_COLOR_DATA = "rgba(59, 130, 246, 0.4)";
 const DEFAULT_LINE_COLOR_INTERACTION = "rgba(56, 189, 248, 0.4)";
