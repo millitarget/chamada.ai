@@ -370,7 +370,7 @@ const SectorSpecificAISolutions: React.FC = () => {
           </svg>
 
           {/* --- Left Side: Business Data --- */}
-          <div className="z-10 space-y-2.5 sm:space-y-3 text-center md:text-left order-2 md:order-1">
+          <div className="z-10 space-y-2.5 sm:space-y-3 text-center md:text-left order-1 md:order-1">
             <h4 className="text-lg sm:text-xl md:text-2xl font-bold text-blue-300 mb-4 sm:mb-6">Dados do Negócio</h4>
             {activeSector.businessData.map(data => (
               <div 
@@ -387,7 +387,7 @@ const SectorSpecificAISolutions: React.FC = () => {
           </div>
 
           {/* --- Center: AI Brain Visual --- */}
-          <div className="z-10 flex flex-col items-center justify-center order-1 md:order-2 pt-0 md:pt-10">
+          <div className="z-10 flex flex-col items-center justify-center order-2 md:order-2 pt-0 md:pt-10">
             <AIBrainVisual brainRefProp={aiBrainRef} />
           </div>
 
