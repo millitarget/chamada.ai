@@ -38,6 +38,7 @@ const HeroNew: React.FC = () => {
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [isSubmittingCallRequest, setIsSubmittingCallRequest] = useState(false);
+  const [callRequestSuccess, setCallRequestSuccess] = useState<boolean | null>(null);
 
   // Ref for the new agent panel
   const agentSelectionPanelRef = useRef<HTMLDivElement>(null);
@@ -494,17 +495,27 @@ const HeroNew: React.FC = () => {
             ))}
           </div>
 
-          <div className="space-y-2 mb-6">
-            <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-300">Número de Telemóvel</label>
-            <input 
-              type="tel" 
-              id="phoneNumber" 
-              name="phoneNumber"
-              value={phoneNumber}
-              onChange={handlePhoneNumberChange}
-              placeholder="+351 9XX XXX XXX"
-              className="w-full px-3 py-2.5 rounded-md bg-gray-800 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-600 transition-colors text-white placeholder-gray-500"
-            />
+          {/* Phone Number Input */}
+          <div className="mt-6">
+            <label htmlFor="phone" className="block text-sm font-medium text-gray-300 mb-1.5">
+              O seu número de telemóvel
+            </label>
+            <div className="relative flex items-center">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm sm:text-base">
+                +351
+              </span>
+              <input 
+                type="tel"
+                name="phone"
+                id="phone"
+                value={phoneNumber}
+                onChange={handlePhoneNumberChange}
+                placeholder="9X XXX XXXX"
+                className="w-full bg-gray-700/50 border border-gray-600 text-white text-sm sm:text-base rounded-md shadow-sm py-2.5 sm:py-3 pl-[calc(3rem+0.75rem)] pr-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-500 transition-all duration-200"
+                // Added pl-[calc(3rem+0.75rem)] to account for +351 prefix width (approx 3rem) + original padding (0.75rem)
+                // Adjust if necessary based on exact prefix width
+              />
+            </div>
           </div>
 
           <button 

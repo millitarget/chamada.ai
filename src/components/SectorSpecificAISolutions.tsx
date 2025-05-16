@@ -321,11 +321,11 @@ const SectorSpecificAISolutions: React.FC = () => {
 
   // --- JSX ---
   const AIBrainVisual = ({ brainRefProp }: { brainRefProp: React.Ref<HTMLDivElement> }) => (
-    <div ref={brainRefProp} className="ai-brain-visual relative w-24 h-24 sm:w-32 sm:h-32 md:w-36 md:h-36 mx-auto my-8 transition-all duration-300 ease-out">
+    <div ref={brainRefProp} className="ai-brain-visual relative w-20 h-20 sm:w-24 sm:h-24 md:w-36 md:h-36 mx-auto my-6 md:my-8 transition-all duration-300 ease-out">
       <div className="absolute inset-0 rounded-full bg-blue-500/30 animate-pulse"></div>
-      <div className="absolute inset-2 sm:inset-3 rounded-full bg-blue-600/50 animate-pulse [animation-delay:0.2s]"></div>
-      <div className="absolute inset-4 sm:inset-6 rounded-full bg-sky-500 flex items-center justify-center shadow-lg shadow-sky-500/30">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 text-white">
+      <div className="absolute inset-1.5 sm:inset-2 rounded-full bg-blue-600/50 animate-pulse [animation-delay:0.2s]"></div>
+      <div className="absolute inset-3 sm:inset-4 rounded-full bg-sky-500 flex items-center justify-center shadow-lg shadow-sky-500/30">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 sm:w-10 sm:h-10 md:w-14 md:h-14 text-white">
           <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5M19.5 8.25h-1.5m-15 3.75H3m18 0h-1.5M19.5 12h-1.5m-15 3.75H3m18 0h-1.5m-3.75 6.75v-1.5m0-15V3" />
         </svg>
       </div>
@@ -333,21 +333,20 @@ const SectorSpecificAISolutions: React.FC = () => {
   );
 
   return (
-    <section className="w-full py-16 sm:py-24 bg-gray-900 text-white overflow-hidden">
+    <section className="w-full py-12 sm:py-20 bg-gray-900 text-white overflow-hidden">
       <div className="container mx-auto px-4">
-        <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-center mb-12 sm:mb-16">
+        <h2 className="text-2xl sm:text-3xl md:text-5xl font-extrabold text-center mb-10 sm:mb-14">
           Chamada.ai em Ação: Soluções Dedicadas
         </h2>
         
-        <div className="flex flex-wrap justify-center gap-3 sm:gap-4 mb-12 sm:mb-16">
+        <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-10 sm:mb-14">
           {sectors.map((sector) => (
             <button
               key={sector.id}
               onClick={() => {
                 setActiveSector(sector);
-                // All other resets are handled by useEffect on activeSector
               }}
-              className={`px-5 py-2.5 rounded-lg text-sm sm:text-base font-semibold transition-all duration-300 ease-in-out transform hover:scale-105
+              className={`px-4 py-2 text-xs sm:px-5 sm:py-2.5 sm:text-sm md:text-base rounded-lg font-semibold transition-all duration-300 ease-in-out transform hover:scale-105
                           ${activeSector.id === sector.id 
                               ? 'bg-blue-600 text-white shadow-xl shadow-blue-500/40' 
                               : 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white hover:shadow-md hover:shadow-gray-600/30'}`}
@@ -357,7 +356,7 @@ const SectorSpecificAISolutions: React.FC = () => {
           ))}
         </div>
 
-        <div className="relative grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-8 md:gap-12 items-start min-h-[450px]">
+        <div className="relative grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-6 md:gap-10 items-start min-h-[400px] md:min-h-[450px]">
           <svg ref={svgCanvasRef} className="absolute top-0 left-0 w-full h-full pointer-events-none z-0">
             {lineDefs.map(line => (
               <path
@@ -365,55 +364,53 @@ const SectorSpecificAISolutions: React.FC = () => {
                 data-lineid={line.id}
                 d={line.d}
                 fill="none"
-                className="line-path transition-all duration-200 ease-out" // GSAP will override styles
+                className="line-path transition-all duration-200 ease-out" 
               />
             ))}
           </svg>
 
           {/* --- Left Side: Business Data --- */}
-          <div className="z-10 space-y-3 sm:space-y-4 text-center md:text-left">
-            <h4 className="text-xl sm:text-2xl font-bold text-blue-300 mb-5 sm:mb-7">Dados do Negócio</h4>
+          <div className="z-10 space-y-2.5 sm:space-y-3 text-center md:text-left order-2 md:order-1">
+            <h4 className="text-lg sm:text-xl md:text-2xl font-bold text-blue-300 mb-4 sm:mb-6">Dados do Negócio</h4>
             {activeSector.businessData.map(data => (
               <div 
                 key={data.id} 
                 ref={(el) => { if (el) businessDataRefs.current.set(data.id, el); else businessDataRefs.current.delete(data.id); }}
                 onClick={() => handleBusinessDataClick(data.id)}
-                className={`interactive-item p-3 sm:p-4 rounded-lg cursor-pointer transition-all duration-200 ease-out bg-gray-800/50 hover:bg-gray-700/70
+                className={`interactive-item p-3 rounded-lg cursor-pointer transition-all duration-200 ease-out bg-gray-800/50 hover:bg-gray-700/70
                             ${selectedBusinessDataId === data.id ? 'ring-2 ring-blue-400 shadow-lg shadow-blue-500/30' : ''}`}
               >
-                <p className="text-sm sm:text-base text-gray-100 group-hover:text-white">{data.label}</p>
-                {data.value && <p className="text-base sm:text-lg font-semibold text-sky-300 group-hover:text-sky-200">{data.value}</p>}
+                <p className="text-xs sm:text-sm text-gray-100 group-hover:text-white">{data.label}</p>
+                {data.value && <p className="text-sm sm:text-base font-semibold text-sky-300 group-hover:text-sky-200">{data.value}</p>}
               </div>
             ))}
           </div>
 
           {/* --- Center: AI Brain Visual --- */}
-          <div className="z-10 flex flex-col items-center justify-center order-first md:order-none pt-5 md:pt-10">
+          <div className="z-10 flex flex-col items-center justify-center order-1 md:order-2 pt-0 md:pt-10">
             <AIBrainVisual brainRefProp={aiBrainRef} />
           </div>
 
           {/* --- Right Side: Client Interactions --- */}
-          <div className="z-10 space-y-4 sm:space-y-5 text-center md:text-left">
-            <h4 className="text-xl sm:text-2xl font-bold text-sky-300 mb-5 sm:mb-7">Interações com Clientes</h4>
+          <div className="z-10 space-y-3 sm:space-y-4 text-center md:text-left order-3 md:order-3">
+            <h4 className="text-lg sm:text-xl md:text-2xl font-bold text-sky-300 mb-4 sm:mb-6">Interações com Clientes</h4>
             {activeSector.clientInteractions.map(interaction => {
               const isRevealed = revealedInteractionId === interaction.id;
-              const showByDefault = !selectedBusinessDataId && !revealedInteractionId; // Show if no selection active
+              const showByDefault = !selectedBusinessDataId && !revealedInteractionId;
 
               return (
                 <div
                   key={interaction.id}
                   ref={(el) => { if (el) clientInteractionRefs.current.set(interaction.id, el); else clientInteractionRefs.current.delete(interaction.id); }}
-                  className={`interactive-item p-3 sm:p-4 rounded-lg bg-gray-800/40 transition-opacity duration-300 ease-out
+                  className={`interactive-item p-3 rounded-lg bg-gray-800/40 transition-opacity duration-300 ease-out text-xs sm:text-sm
                               ${isRevealed ? 'opacity-100 scale-100 shadow-lg shadow-sky-500/30 ring-1 ring-sky-400' : ''}
                               ${!isRevealed && !showByDefault ? 'opacity-0 scale-90 pointer-events-none' : ''}
                               ${showByDefault ? 'opacity-100 scale-100' : ''}
                             `}
-                  // GSAP will manage display:none for hidden ones during timeline.
-                  // This conditional styling ensures correct initial state and after deselection.
                   style={{ display: (!isRevealed && !showByDefault && selectedBusinessDataId) ? 'none' : 'block' }} 
                 >
-                  <p className="text-sm text-gray-300 mb-1">Cliente: <span className="text-gray-50 italic">"{interaction.query}"</span></p>
-                  <p className="text-sm text-sky-300">AI: <span className="text-sky-100 font-medium">"{interaction.response}"</span></p>
+                  <p className="text-gray-300 mb-1">Cliente: <span className="text-gray-50 italic">"{interaction.query}"</span></p>
+                  <p className="text-sky-300">AI: <span className="text-sky-100 font-medium">"{interaction.response}"</span></p>
                 </div>
               );
             })}
