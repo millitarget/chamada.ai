@@ -5,6 +5,8 @@
 @layer base {
   :root {
     --color-neon-blue: 59, 130, 246;
+    --scrollbar-thumb: 71, 85, 105;
+    --scrollbar-track: 15, 23, 42;
   }
   
   html {
@@ -12,11 +14,30 @@
   }
   
   body {
-    @apply antialiased;
+    @apply antialiased bg-black text-white;
   }
 
   h1, h2, h3, h4, h5, h6 {
     text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  }
+  
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: rgba(var(--scrollbar-track), 0.2);
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: rgba(var(--scrollbar-thumb), 0.6);
+    border-radius: 5px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(var(--scrollbar-thumb), 0.8);
   }
 }
 
@@ -45,6 +66,53 @@
   text-shadow: none;
 }
 
+/* Motion path animation class */
+.motion-path {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+
+/* Custom animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-15px); }
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 4s ease-in-out infinite;
+}
+
+.animate-gradient-shift {
+  animation: gradient-shift 8s ease infinite;
+  background-size: 200% 200%;
+}
+
+.animate-shimmer {
+  animation: shimmer 2s linear infinite;
+  background: linear-gradient(to right, rgba(59, 130, 246, 0) 0%, rgba(59, 130, 246, 0.25) 25%, rgba(59, 130, 246, 0.1) 50%, rgba(59, 130, 246, 0) 100%);
+  background-size: 200% 100%;
+}
+
 @layer components {
   .backdrop-blur-custom {
     backdrop-filter: blur(8px);
@@ -61,5 +129,23 @@
   
   .text-shadow-lg {
     text-shadow: 0 4px 8px rgba(0, 0, 0, 0.7);
+  }
+  
+  /* Glass morphism components */
+  .glass {
+    @apply bg-white/10 backdrop-blur-custom border border-white/20;
+  }
+  
+  .glass-dark {
+    @apply bg-black/40 backdrop-blur-custom border border-gray-700/30;
+  }
+  
+  /* Button styles */
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 px-6 rounded-lg shadow-lg transition-all duration-300 hover:shadow-blue-600/30;
+  }
+  
+  .btn-ghost {
+    @apply border border-gray-700 hover:border-blue-500 text-white font-medium py-3 px-6 rounded-lg shadow-sm transition-all duration-300 hover:bg-blue-500/10;
   }
 } 
