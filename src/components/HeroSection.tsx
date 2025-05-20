@@ -509,7 +509,9 @@ const HeroNew: React.FC = () => {
     setCallRequestSuccess(null);
     
     try {
-      const backendUrl = 'http://localhost:5001/api/start_call'; // Ensure this matches your Python backend URL
+      // Use relative URL that works in both development and production
+      const backendUrl = '/api/start_call';
+      
       const response = await fetch(backendUrl, {
         method: 'POST',
         headers: {
