@@ -1,0 +1,10 @@
+python-dotenv
+livekit-agents
+livekit
+livekit-plugins-openai
+openai
+backoff
+websockets
+asyncio
+pytz
+tzdata 

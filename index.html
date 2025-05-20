@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Experimenta Grátis - Agente de Chamadas</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
+        h1 { color: #0056b3; text-align: center;}
+        label { display: block; margin-bottom: 8px; font-weight: bold; }
+        input[type="text"], select { width: calc(100% - 22px); padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; }
+        button { background-color: #007bff; color: white; padding: 12px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; width: 100%; }
+        button:hover { background-color: #0056b3; }
+        .message { margin-top: 15px; padding: 10px; border-radius: 4px; text-align: center; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Experimenta Grátis o Nosso Agente de Chamadas</h1>
+        <form id="callAgentForm">
+            <div>
+                <label for="phone_number">Número de Telefone (ex: +351912345678):</label>
+                <input type="text" id="phone_number" name="phone_number" required>
+            </div>
+            <div>
+                <label for="persona">Escolha a Persona:</label>
+                <select id="persona" name="persona" required>
+                    <option value="restaurante">Restaurante</option>
+                    <option value="clinica_dentaria">Clínica Dentária</option>
+                    <option value="vendedor">Vendedor</option>
+                </select>
+            </div>
+            <div>
+                <label for="customer_name">Seu Nome (Opcional):</label>
+                <input type="text" id="customer_name" name="customer_name">
+            </div>
+            <button type="submit">Ligar Agora!</button>
+        </form>
+        <div id="responseMessage" class="message" style="display:none;"></div>
+    </div>
+
+    <script>
+        document.getElementById('callAgentForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const phoneNumber = document.getElementById('phone_number').value;
+            const persona = document.getElementById('persona').value;
+            const customerName = document.getElementById('customer_name').value;
+            const responseMessageDiv = document.getElementById('responseMessage');
+
+            responseMessageDiv.style.display = 'none';
+            responseMessageDiv.className = 'message'; // Reset classes
+
+            // Basic phone number validation (optional, add more robust validation as needed)
+            if (!phoneNumber.match(/^\+?[1-9]\d{1,14}$/)) {
+                responseMessageDiv.textContent = 'Por favor, insira um número de telefone válido (ex: +351912345678).';
+                responseMessageDiv.classList.add('error');
+                responseMessageDiv.style.display = 'block';
+                return;
+            }
+
+            const backendUrl = 'http://localhost:5001/api/start_call'; // URL of your Flask backend in website_backend.py
+
+            try {
+                const response = await fetch(backendUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        phone_number: phoneNumber,
+                        persona: persona,
+                        customer_name: customerName
+                    }),
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    responseMessageDiv.textContent = result.message || 'Pedido de chamada enviado com sucesso!';
+                    responseMessageDiv.classList.add('success');
+                } else {
+                    responseMessageDiv.textContent = 'Erro: ' + (result.details || result.error || 'Ocorreu um erro desconhecido.');
+                    responseMessageDiv.classList.add('error');
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                responseMessageDiv.textContent = 'Erro ao comunicar com o servidor. Verifique a consola do navegador e se o backend (website_backend.py) está em execução.';
+                responseMessageDiv.classList.add('error');
+            }
+            responseMessageDiv.style.display = 'block';
+        });
+    </script>
+</body>
+</html> 

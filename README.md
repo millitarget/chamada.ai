@@ -53,4 +53,40 @@ O site foi desenvolvido seguindo as seguintes diretrizes:
 
 ## Nota
 
-Esta é uma versão apenas frontend do website chamada.ai. Todas as funcionalidades de chamadas e interações com API foram removidas. O formulário de contacto simula o envio, mas não faz nenhuma chamada de API real. 
+Esta é uma versão apenas frontend do website chamada.ai. Todas as funcionalidades de chamadas e interações com API foram removidas. O formulário de contacto simula o envio, mas não faz nenhuma chamada de API real.
+
+## Multi-Persona Outbound Agent
+
+This project now includes a flexible outbound calling agent that can adapt to different personas based on user selection:
+
+### Key Features
+
+- Adapts to different personas (dentist/clinic, sales, etc.)
+- Uses persona-specific prompts and greetings
+- Initiates outbound calls via SIP
+- Uses LiveKit for real-time audio communication
+
+### Available Personas
+
+- **Clinic/Dentist**: For dental appointments and clinic-related interactions
+- **Sales**: For sales and product demonstration calls
+- **Default**: A generic assistant that works with any unspecified persona
+
+### How to Run
+
+1. Start the outbound agent worker:
+   ```
+   python outbound_agent.py dev
+   ```
+
+2. Start the website backend:
+   ```
+   python website_backend.py
+   ```
+
+3. Make a call request with your desired persona:
+   ```
+   curl -X POST http://localhost:5001/api/start_call -H "Content-Type: application/json" -d "{\"phone_number\": \"+351XXXXXXXXX\", \"persona\": \"clinica\", \"customer_name\": \"Customer Name\"}"
+   ```
+
+The agent will adapt its behavior and conversation style based on the selected persona. 

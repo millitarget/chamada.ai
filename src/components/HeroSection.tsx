@@ -37,8 +37,10 @@ const HeroNew: React.FC = () => {
   const [isAgentPanelVisible, setIsAgentPanelVisible] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string>("");
+  const [customerName, setCustomerName] = useState<string>("");
   const [isSubmittingCallRequest, setIsSubmittingCallRequest] = useState(false);
   const [callRequestSuccess, setCallRequestSuccess] = useState<boolean | null>(null);
+  const [responseMessage, setResponseMessage] = useState<string>("");
 
   // Ref for the new agent panel
   const agentSelectionPanelRef = useRef<HTMLDivElement>(null);
@@ -412,29 +414,82 @@ const HeroNew: React.FC = () => {
     setPhoneNumber(event.target.value);
   };
 
+  const handleCustomerNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomerName(event.target.value);
+  };
+
   const handleSubmitCallRequest = async () => {
     if (!selectedAgent) {
-      alert("Por favor, selecione um tipo de agente.");
+      setResponseMessage("Por favor, selecione um tipo de agente.");
+      setCallRequestSuccess(false);
+      setIsSubmittingCallRequest(false); // Ensure button is re-enabled
+      // You might want to clear the message after a few seconds
+      setTimeout(() => setResponseMessage(""), 3000);
       return;
     }
-    if (!phoneNumber.trim()) {
-      alert("Por favor, introduza o seu número de telemóvel.");
+    // Basic phone validation (you might want a more robust one)
+    if (!phoneNumber.trim() || !/^\+?[1-9]\d{7,14}$/.test(phoneNumber.trim())) {
+      setResponseMessage("Por favor, introduza um número de telemóvel válido (ex: +351912345678).");
+      setCallRequestSuccess(false);
+      setIsSubmittingCallRequest(false); // Ensure button is re-enabled
+      setTimeout(() => setResponseMessage(""), 4000);
       return;
     }
 
     setIsSubmittingCallRequest(true);
-    console.log("Solicitação de chamada:", { agent: selectedAgent, phone: phoneNumber });
+    setResponseMessage(""); // Clear previous messages
+    setCallRequestSuccess(null);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5 seconds delay
+    console.log("Submitting call request:", { agent: selectedAgent, phone: phoneNumber, name: customerName });
 
-    setIsSubmittingCallRequest(false);
-    alert(`Chamada pedida para ${selectedAgent} para o número ${phoneNumber}! (Simulado)`);
-    
-    // Optionally close panel and reset states
-    setIsAgentPanelVisible(false);
-    setSelectedAgent(null);
-    setPhoneNumber("");
+    try {
+      const backendUrl = 'http://localhost:5001/api/start_call'; // Ensure this matches your Python backend URL
+      const response = await fetch(backendUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone_number: phoneNumber,
+          persona: selectedAgent,
+          customer_name: customerName || "Website User" // Send default if empty
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setResponseMessage(result.message || "Pedido de chamada enviado com sucesso!");
+        setCallRequestSuccess(true);
+        // Optionally close panel and reset states after a short delay
+        setTimeout(() => {
+          setIsAgentPanelVisible(false);
+          setSelectedAgent(null);
+          setPhoneNumber("");
+          setCustomerName("");
+          setResponseMessage(""); // Clear success message before closing
+          setCallRequestSuccess(null);
+        }, 3000); // Close after 3 seconds
+      } else {
+        setResponseMessage(`Erro: ${result.details || result.error || 'Ocorreu um erro ao processar o pedido.'}`);
+        setCallRequestSuccess(false);
+      }
+    } catch (error) {
+      console.error('Fetch error:', error);
+      setResponseMessage('Erro ao comunicar com o servidor. Tente novamente mais tarde.');
+      setCallRequestSuccess(false);
+    } finally {
+      setIsSubmittingCallRequest(false);
+       // Clear non-success messages after a few seconds
+      if (callRequestSuccess === false) { // Check current outcome, not the one from state before this render
+          setTimeout(() => {
+              if (!callRequestSuccess) { // Re-check in case another submission happened
+                  setResponseMessage("");
+                  setCallRequestSuccess(null);
+              }
+          }, 5000);
+      }
+    }
   };
 
   const agentTypes = [
@@ -498,7 +553,7 @@ const HeroNew: React.FC = () => {
           {/* Phone Number Input */}
           <div className="mt-6">
             <label htmlFor="phone" className="block text-sm font-medium text-gray-300 mb-1.5">
-              O seu número de telemóvel
+              Seu Telemóvel (ex: +351912345678)
             </label>
             <div className="relative flex items-center">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm sm:text-base">
@@ -510,31 +565,56 @@ const HeroNew: React.FC = () => {
                 id="phone"
                 value={phoneNumber}
                 onChange={handlePhoneNumberChange}
-                placeholder="9X XXX XXXX"
-                className="w-full bg-gray-700/50 border border-gray-600 text-white text-sm sm:text-base rounded-md shadow-sm py-2.5 sm:py-3 pl-[calc(3rem+0.75rem)] pr-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-500 transition-all duration-200"
-                // Added pl-[calc(3rem+0.75rem)] to account for +351 prefix width (approx 3rem) + original padding (0.75rem)
-                // Adjust if necessary based on exact prefix width
+                placeholder="+351912345678"
+                className="w-full bg-gray-800 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 transition text-white"
+                required
               />
             </div>
           </div>
 
+          {/* Customer Name Input (Optional) - Added */}
+          <div className="mt-4">
+            <label htmlFor="customerName" className="block text-sm font-medium text-gray-300 mb-1.5">
+              Seu Nome (Opcional)
+            </label>
+            <input 
+              type="text" 
+              id="customerName" 
+              name="customerName" 
+              value={customerName}
+              onChange={handleCustomerNameChange}
+              placeholder="Como podemos chamá-lo(a)?"
+              className="w-full p-3 bg-gray-800 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 transition text-white"
+            />
+          </div>
+
           <button 
             onClick={handleSubmitCallRequest}
-            disabled={isSubmittingCallRequest}
-            className={`w-full h-11 px-4 py-2 font-semibold rounded-md shadow-sm transition-colors flex items-center justify-center 
-                        ${isSubmittingCallRequest 
-                            ? 'bg-blue-500/70 text-gray-300 cursor-not-allowed' 
-                            : 'bg-blue-600 text-white hover:bg-blue-500'}`}
+            disabled={isSubmittingCallRequest || !selectedAgent || !phoneNumber.trim()}
+            className={`w-full mt-8 p-3 sm:p-4 rounded-lg font-semibold transition-all duration-200 ease-in-out flex items-center justify-center
+                        ${isSubmittingCallRequest || !selectedAgent || !phoneNumber.trim() 
+                            ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
+                            : 'bg-green-600 hover:bg-green-500 text-white shadow-md hover:shadow-lg focus:ring-2 focus:ring-green-400 focus:ring-offset-2 focus:ring-offset-gray-900'}`}
           >
             {isSubmittingCallRequest ? (
-              <svg className="animate-spin h-5 w-5 " xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
+              <>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                A pedir chamada...
+              </>
             ) : (
               "Pedir Chamada Agora"
             )}
           </button>
+
+          {responseMessage && (
+            <div className={`mt-4 text-center text-sm p-3 rounded-md ${callRequestSuccess === true ? 'bg-green-700/50 text-green-200 border border-green-600' : callRequestSuccess === false ? 'bg-red-700/50 text-red-200 border border-red-600' : 'hidden'}`}>
+              {responseMessage}
+            </div>
+          )}
+
         </div>
 
       </div>
