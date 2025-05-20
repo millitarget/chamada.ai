@@ -4,6 +4,9 @@ import { useState, useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import VantaBackground from './VantaBackground';
+import Image from 'next/image';
+import { FaCheck, FaUtensils, FaTeeth, FaShoppingBag, FaChevronRight, FaChevronLeft, FaPhone } from 'react-icons/fa'; 
+import Flag from 'react-world-flags';
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger); 
@@ -41,6 +44,10 @@ const HeroNew: React.FC = () => {
   const [isSubmittingCallRequest, setIsSubmittingCallRequest] = useState(false);
   const [callRequestSuccess, setCallRequestSuccess] = useState<boolean | null>(null);
   const [responseMessage, setResponseMessage] = useState<string>("");
+  
+  // New state for multi-step form
+  const [currentStep, setCurrentStep] = useState(1); // 1: Agent, 2: Phone, 3: Name, 4: Success
+  const [formErrors, setFormErrors] = useState<{phone?: string}>({});
 
   // Ref for the new agent panel
   const agentSelectionPanelRef = useRef<HTMLDivElement>(null);
@@ -155,14 +162,6 @@ const HeroNew: React.FC = () => {
         ctaQuickToRotateX.current?.(0); 
         ctaQuickToRotateY.current?.(0); 
         currentCtaButtonRef.style.setProperty("--glow-opacity", "0"); 
-
-        // Reset parallax elements to origin, could also be done on section mouse leave
-        // parallaxElements.forEach(item => {
-        //     if (item.ref) {
-        //         parallaxQuickToX.current.get(item.ref)?.(0);
-        //         parallaxQuickToY.current.get(item.ref)?.(0);
-        //     }
-        // });
       } 
     };
     currentCtaButtonRef.addEventListener('mouseleave', handleCtaMouseLeave);
@@ -189,8 +188,15 @@ const HeroNew: React.FC = () => {
     const handleCtaClick = () => { 
       if(currentCtaButtonRef) { 
         gsap.fromTo(currentCtaButtonRef, { scale: 1 }, { scale: 0.95, duration: 0.1, yoyo: true, repeat: 1, ease: "power1.inOut" }); 
-        // console.log("CTA Clicked!"); 
         setIsAgentPanelVisible(prev => !prev); // Toggle visibility state
+        // Reset to first step when opening panel
+        setCurrentStep(1);
+        setSelectedAgent(null);
+        setPhoneNumber("");
+        setCustomerName("");
+        setResponseMessage("");
+        setCallRequestSuccess(null);
+        setFormErrors({});
       }
     };
     currentCtaButtonRef.addEventListener('click', handleCtaClick);
@@ -365,74 +371,136 @@ const HeroNew: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted]); // Removed generateWavePath from deps, it's stable
 
-  // Effect to animate agent panel based on isAgentPanelVisible state
+  // Effect for agent panel animations
   useEffect(() => {
-    if (agentSelectionPanelRef.current) {
+    if (mounted && agentSelectionPanelRef.current) {
+      const panel = agentSelectionPanelRef.current;
+      
       if (isAgentPanelVisible) {
-        gsap.set(agentSelectionPanelRef.current, { display: 'block', opacity: 0, y: -20 });
-        gsap.to(agentSelectionPanelRef.current, { 
+        // Reset to make sure panel is visible 
+        gsap.set(panel, { display: 'block', opacity: 0, y: 30 });
+        
+        // Fade in animation
+        gsap.to(panel, {
           opacity: 1, 
           y: 0, 
-          duration: 0.4, // Slightly faster panel bg anim
-          ease: "power2.out",
+          duration: 0.5, 
+          ease: "power3.out",
           onComplete: () => {
-            // Stagger animate children of the panel
-            if (agentSelectionPanelRef.current) {
-              // Select direct children that are visually distinct sections for stagger
-              const childrenToAnimate = Array.from(agentSelectionPanelRef.current.querySelectorAll(":scope > h3, :scope > div, :scope > button"));
-              gsap.fromTo(childrenToAnimate, 
-                { opacity: 0, y: 15 }, 
-                { opacity: 1, y: 0, duration: 0.35, stagger: 0.07, ease: "power1.out" }
-              );
-            }
+            // Step-specific animations - let GSAP handle the current step display
+            const steps = panel.querySelectorAll('[data-step]');
+            steps.forEach(step => {
+              const stepNum = parseInt((step as HTMLElement).dataset.step || "0");
+              gsap.set(step, { 
+                display: stepNum === currentStep ? 'block' : 'none',
+                opacity: stepNum === currentStep ? 0 : 0 
+              });
+              
+              if (stepNum === currentStep) {
+                // Animate in the current step
+                gsap.to(step, { opacity: 1, duration: 0.4, delay: 0.2 });
+              }
+            });
           }
         });
       } else {
-        gsap.to(agentSelectionPanelRef.current, { 
+        // Fade out animation
+        gsap.to(panel, {
           opacity: 0, 
-          y: -20, 
-          duration: 0.3, 
-          ease: "power1.in", 
-          onComplete: () => {
-            if (agentSelectionPanelRef.current) {
-              agentSelectionPanelRef.current.style.display = 'none';
-              // Reset children opacity if they were animated individually, though parent opacity 0 handles it visually
-              const childrenToReset = Array.from(agentSelectionPanelRef.current.querySelectorAll(":scope > h3, :scope > div, :scope > button"));
-              gsap.set(childrenToReset, { opacity: 0 }); 
-            }
-        }});
+          y: 20, 
+          duration: 0.4, 
+          ease: "power2.in",
+          onComplete: () => { 
+            gsap.set(panel, { display: 'none' }); 
+          }
+        });
       }
     }
-  }, [isAgentPanelVisible]);
+  }, [isAgentPanelVisible, mounted, currentStep]);
+
+  // Reset the form when changing steps
+  useEffect(() => {
+    if (agentSelectionPanelRef.current) {
+      const steps = agentSelectionPanelRef.current.querySelectorAll('[data-step]');
+      steps.forEach(step => {
+        const stepNum = parseInt((step as HTMLElement).dataset.step || "0");
+        gsap.set(step, { 
+          display: stepNum === currentStep ? 'block' : 'none'
+        });
+        
+        if (stepNum === currentStep) {
+          // Animate in the current step
+          gsap.fromTo(step, 
+            { opacity: 0, y: 20 }, 
+            { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }
+          );
+        }
+      });
+    }
+  }, [currentStep]);
 
   const handleAgentSelection = (agent: string) => {
     setSelectedAgent(agent);
-    // Potentially scroll to phone input or highlight next step
+    // Move to next step after a brief delay
+    setTimeout(() => {
+      setCurrentStep(2);
+    }, 300);
   };
 
   const handlePhoneNumberChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setPhoneNumber(event.target.value);
+    const value = event.target.value;
+    // Only allow digits, format will be added by placeholder and prefix
+    const cleanedValue = value.replace(/\D/g, '');
+    setPhoneNumber(cleanedValue);
+    
+    // Clear error when user types
+    if (formErrors.phone) {
+      setFormErrors(prev => ({ ...prev, phone: undefined }));
+    }
   };
 
   const handleCustomerNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setCustomerName(event.target.value);
   };
 
+  const goToNextStep = () => {
+    // Validate before moving to next step
+    if (currentStep === 2) {
+      // Validate phone number
+      if (!phoneNumber.trim() || phoneNumber.length < 9) {
+        setFormErrors({ phone: "Por favor, introduza um número de telemóvel válido (9 dígitos)" });
+        return;
+      }
+    }
+
+    setCurrentStep(prev => Math.min(prev + 1, 4));
+  };
+
+  const goToPreviousStep = () => {
+    setCurrentStep(prev => Math.max(prev - 1, 1));
+  };
+
+  const resetForm = () => {
+    setCurrentStep(1);
+    setSelectedAgent(null);
+    setPhoneNumber("");
+    setCustomerName("");
+    setResponseMessage("");
+    setCallRequestSuccess(null);
+    setFormErrors({});
+  };
+
   const handleSubmitCallRequest = async () => {
+    // Final validation before API call
     if (!selectedAgent) {
       setResponseMessage("Por favor, selecione um tipo de agente.");
       setCallRequestSuccess(false);
-      setIsSubmittingCallRequest(false); // Ensure button is re-enabled
-      // You might want to clear the message after a few seconds
-      setTimeout(() => setResponseMessage(""), 3000);
       return;
     }
-    // Basic phone validation (you might want a more robust one)
-    if (!phoneNumber.trim() || !/^\+?[1-9]\d{7,14}$/.test(phoneNumber.trim())) {
-      setResponseMessage("Por favor, introduza um número de telemóvel válido (ex: +351912345678).");
+    
+    if (!phoneNumber.trim() || phoneNumber.length < 9) {
+      setFormErrors({ phone: "Por favor, introduza um número de telemóvel válido (9 dígitos)" });
       setCallRequestSuccess(false);
-      setIsSubmittingCallRequest(false); // Ensure button is re-enabled
-      setTimeout(() => setResponseMessage(""), 4000);
       return;
     }
 
@@ -440,8 +508,6 @@ const HeroNew: React.FC = () => {
     setResponseMessage(""); // Clear previous messages
     setCallRequestSuccess(null);
     
-    console.log("Submitting call request:", { agent: selectedAgent, phone: phoneNumber, name: customerName });
-
     try {
       const backendUrl = 'http://localhost:5001/api/start_call'; // Ensure this matches your Python backend URL
       const response = await fetch(backendUrl, {
@@ -450,7 +516,7 @@ const HeroNew: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          phone_number: phoneNumber,
+          phone_number: "+351" + phoneNumber,
           persona: selectedAgent,
           customer_name: customerName || "Website User" // Send default if empty
         }),
@@ -461,15 +527,7 @@ const HeroNew: React.FC = () => {
       if (response.ok) {
         setResponseMessage(result.message || "Pedido de chamada enviado com sucesso!");
         setCallRequestSuccess(true);
-        // Optionally close panel and reset states after a short delay
-        setTimeout(() => {
-          setIsAgentPanelVisible(false);
-          setSelectedAgent(null);
-          setPhoneNumber("");
-          setCustomerName("");
-          setResponseMessage(""); // Clear success message before closing
-          setCallRequestSuccess(null);
-        }, 3000); // Close after 3 seconds
+        setCurrentStep(4); // Move to success step
       } else {
         setResponseMessage(`Erro: ${result.details || result.error || 'Ocorreu um erro ao processar o pedido.'}`);
         setCallRequestSuccess(false);
@@ -480,22 +538,28 @@ const HeroNew: React.FC = () => {
       setCallRequestSuccess(false);
     } finally {
       setIsSubmittingCallRequest(false);
-       // Clear non-success messages after a few seconds
-      if (callRequestSuccess === false) { // Check current outcome, not the one from state before this render
-          setTimeout(() => {
-              if (!callRequestSuccess) { // Re-check in case another submission happened
-                  setResponseMessage("");
-                  setCallRequestSuccess(null);
-              }
-          }, 5000);
-      }
     }
   };
 
   const agentTypes = [
-    { id: "restaurante", name: "Restaurante", description: "Agente especializado em restaurantes." }, 
-    { id: "clinica", name: "Clínica Dentária", description: "Agente para marcar consultas e informações." },
-    { id: "vendedor", name: "Vendedor", description: "Agente para assistência de vendas." }
+    { 
+      id: "restaurante", 
+      name: "Restaurante", 
+      description: "Agente especializado em restaurantes para gerir reservas e responder a dúvidas sobre o menu e horário.",
+      icon: <FaUtensils size={28} />
+    }, 
+    { 
+      id: "clinica", 
+      name: "Clínica Dentária", 
+      description: "Agente para marcar consultas, responder a dúvidas sobre tratamentos e verificar disponibilidade.",
+      icon: <FaTeeth size={28} />
+    },
+    { 
+      id: "vendedor", 
+      name: "Vendedor", 
+      description: "Agente para assistência de vendas, informações sobre produtos e resolução de problemas com pedidos.",
+      icon: <FaShoppingBag size={28} />
+    }
   ];
 
   return (
@@ -526,95 +590,234 @@ const HeroNew: React.FC = () => {
           <div className="absolute inset-0 rounded-lg bg-blue-500 opacity-0 group-hover:opacity-10 transition-opacity duration-300 blur-md"></div>
         </button>
 
-        {/* Agent Selection Panel (shadcn/ui inspired) */}
+        {/* Multi-step Agent Selection Panel - Mobile optimized */}
         <div 
           ref={agentSelectionPanelRef} 
-          className="w-full max-w-md sm:max-w-lg md:max-w-xl mt-8 p-6 bg-gray-900/80 backdrop-blur-md border border-gray-700 rounded-lg shadow-2xl text-gray-50"
+          className="w-full max-w-md sm:max-w-lg md:max-w-xl mt-8 bg-gray-900/80 backdrop-blur-xl border border-gray-700 rounded-xl shadow-2xl text-gray-50 overflow-hidden"
           style={{ display: 'none' }} 
         >
-          <h3 className="text-xl sm:text-2xl font-semibold text-white mb-6 text-center">Escolha o Agente Virtual</h3>
+          {/* Progress bar */}
+          <div className="w-full bg-gray-800 h-2">
+            <div 
+              className="h-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-500 ease-out"
+              style={{ width: `${(currentStep / 4) * 100}%` }}
+            ></div>
+          </div>
           
-          <div className="space-y-4 mb-6">
-            {agentTypes.map(agent => (
-              <button 
-                key={agent.id} 
-                onClick={() => handleAgentSelection(agent.id)}
-                className={`w-full p-4 rounded-md border transition-all duration-200 ease-in-out text-left flex flex-col items-start 
-                            ${selectedAgent === agent.id 
-                                ? 'bg-blue-600 border-blue-500 ring-2 ring-blue-500 ring-offset-2 ring-offset-gray-900' 
-                                : 'bg-gray-800 border-gray-700 hover:border-blue-400 hover:bg-gray-700/60'}`}
-              >
-                <span className="block text-md sm:text-lg font-semibold text-white">{agent.name}</span>
-                <span className="block text-xs sm:text-sm text-gray-400 mt-1">{agent.description}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Phone Number Input */}
-          <div className="mt-6">
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-300 mb-1.5">
-              Seu Telemóvel (ex: +351912345678)
-            </label>
-            <div className="relative flex items-center">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm sm:text-base">
-                +351
-              </span>
-              <input 
-                type="tel"
-                name="phone"
-                id="phone"
-                value={phoneNumber}
-                onChange={handlePhoneNumberChange}
-                placeholder="+351912345678"
-                className="w-full bg-gray-800 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 transition text-white"
-                required
-              />
+          {/* Step 1: Agent Selection - Mobile optimized */}
+          <div data-step="1" className="p-4 sm:p-6">
+            <h3 className="text-xl sm:text-2xl font-semibold text-white mb-6 sm:mb-8 text-center">Escolha o Agente Virtual</h3>
+            
+            <div className="grid grid-cols-1 gap-3 sm:gap-4">
+              {agentTypes.map(agent => (
+                <button 
+                  key={agent.id} 
+                  onClick={() => handleAgentSelection(agent.id)}
+                  className="group relative w-full p-4 sm:p-5 rounded-lg border-2 transition-all duration-300 ease-out text-left flex items-start gap-3 sm:gap-4
+                            bg-gradient-to-br from-gray-800/70 to-gray-900/90 hover:from-blue-900/30 hover:to-blue-800/20
+                            border-gray-700 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/10"
+                >
+                  <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-blue-900/40 group-hover:bg-blue-900/60 flex items-center justify-center transition-all duration-300">
+                    {agent.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="block text-md sm:text-lg font-semibold text-white mb-1">{agent.name}</span>
+                    <span className="block text-xs sm:text-sm text-gray-400 line-clamp-2 sm:line-clamp-none">{agent.description}</span>
+                  </div>
+                  <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <FaChevronRight className="text-blue-400" />
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
-
-          {/* Customer Name Input (Optional) - Added */}
-          <div className="mt-4">
-            <label htmlFor="customerName" className="block text-sm font-medium text-gray-300 mb-1.5">
-              Seu Nome (Opcional)
-            </label>
-            <input 
-              type="text" 
-              id="customerName" 
-              name="customerName" 
-              value={customerName}
-              onChange={handleCustomerNameChange}
-              placeholder="Como podemos chamá-lo(a)?"
-              className="w-full p-3 bg-gray-800 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 transition text-white"
-            />
+          
+          {/* Step 2: Phone Number */}
+          <div data-step="2" className="p-6" style={{ display: 'none' }}>
+            <button 
+              onClick={goToPreviousStep}
+              className="group flex items-center text-sm text-gray-400 hover:text-white mb-6 transition-colors"
+            >
+              <FaChevronLeft className="mr-1" />
+              <span>Voltar</span>
+            </button>
+            
+            <h3 className="text-2xl font-semibold text-white mb-8 text-center">Seu Número de Telemóvel</h3>
+            
+            <div className="mb-6">
+              <div className="relative">
+                {/* Phone input with proper styling */}
+                <div className="flex">
+                  <div className="relative inline-flex items-center border-y border-l border-gray-600 bg-gray-800/80 rounded-l-lg px-3 py-4">
+                    <Flag code="PT" className="h-4 w-6 mr-2" />
+                    <span className="text-white text-lg font-medium">+351</span>
+                  </div>
+                  <input 
+                    type="tel"
+                    name="phone"
+                    id="phone"
+                    value={phoneNumber}
+                    onChange={handlePhoneNumberChange}
+                    placeholder="912 345 678"
+                    className="w-full py-4 px-4 border-y border-r border-gray-600 bg-gray-800/80 rounded-r-lg 
+                            focus:ring-2 focus:ring-blue-500 focus:border-blue-500 
+                            text-white text-lg tracking-wide"
+                    maxLength={9}
+                    pattern="[0-9]{9}"
+                    required
+                  />
+                </div>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
+                  <FaPhone />
+                </div>
+              </div>
+              {formErrors.phone && (
+                <p className="text-red-400 text-sm mt-2">{formErrors.phone}</p>
+              )}
+              <p className="text-gray-500 text-xs mt-2 font-light">Exemplo: 912345678 (9 dígitos)</p>
+            </div>
+            
+            <button 
+              onClick={goToNextStep}
+              disabled={!phoneNumber || phoneNumber.length < 9}
+              className={`w-full py-4 rounded-lg font-semibold transition-all duration-300 
+                        flex items-center justify-center gap-2
+                        ${!phoneNumber || phoneNumber.length < 9 
+                          ? 'bg-gray-700 text-gray-400 cursor-not-allowed' 
+                          : 'bg-blue-600 hover:bg-blue-500 text-white shadow-md hover:shadow-blue-600/30'}`}
+            >
+              <span>Continuar</span>
+              <FaChevronRight />
+            </button>
           </div>
-
-          <button 
-            onClick={handleSubmitCallRequest}
-            disabled={isSubmittingCallRequest || !selectedAgent || !phoneNumber.trim()}
-            className={`w-full mt-8 p-3 sm:p-4 rounded-lg font-semibold transition-all duration-200 ease-in-out flex items-center justify-center
-                        ${isSubmittingCallRequest || !selectedAgent || !phoneNumber.trim() 
-                            ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
-                            : 'bg-green-600 hover:bg-green-500 text-white shadow-md hover:shadow-lg focus:ring-2 focus:ring-green-400 focus:ring-offset-2 focus:ring-offset-gray-900'}`}
-          >
-            {isSubmittingCallRequest ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                A pedir chamada...
-              </>
-            ) : (
-              "Pedir Chamada Agora"
+          
+          {/* Step 3: Name and Submit */}
+          <div data-step="3" className="p-6" style={{ display: 'none' }}>
+            <button 
+              onClick={goToPreviousStep}
+              className="group flex items-center text-sm text-gray-400 hover:text-white mb-6 transition-colors"
+            >
+              <FaChevronLeft className="mr-1" />
+              <span>Voltar</span>
+            </button>
+            
+            <h3 className="text-2xl font-semibold text-white mb-6 text-center">Confirmação</h3>
+            
+            <div className="mb-6 bg-gray-800/60 p-4 rounded-lg border border-gray-700">
+              <p className="text-gray-300 mb-2 text-sm">Agente selecionado:</p>
+              <div className="flex items-center gap-3 mb-4">
+                {selectedAgent && (
+                  <>
+                    <div className="w-8 h-8 rounded-full bg-blue-900/40 flex items-center justify-center">
+                      {agentTypes.find(a => a.id === selectedAgent)?.icon}
+                    </div>
+                    <span className="font-medium text-white">
+                      {agentTypes.find(a => a.id === selectedAgent)?.name}
+                    </span>
+                  </>
+                )}
+              </div>
+              
+              <p className="text-gray-300 mb-2 text-sm">Número de telemóvel:</p>
+              <p className="font-medium text-white mb-4">+351 {phoneNumber}</p>
+            </div>
+            
+            {/* Name Input (Optional) - Improved alignment and aesthetics */}
+            <div className="mb-8">
+              <label htmlFor="customerName" className="block text-sm font-medium text-gray-300 mb-2 ml-1">
+                Seu Nome (Opcional)
+              </label>
+              <div className="relative">
+                <input 
+                  type="text" 
+                  id="customerName" 
+                  name="customerName" 
+                  value={customerName}
+                  onChange={handleCustomerNameChange}
+                  placeholder="Como podemos chamá-lo(a)?"
+                  className="w-full px-4 py-4 bg-gray-800/80 border-2 border-gray-700 rounded-lg 
+                           focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all 
+                           duration-300 text-white text-lg"
+                />
+                <div className="absolute inset-0 pointer-events-none border-2 border-transparent rounded-lg"></div>
+              </div>
+              <p className="text-gray-500 text-xs mt-2 ml-1 font-light">Usaremos este nome durante a chamada</p>
+            </div>
+            
+            <button 
+              onClick={handleSubmitCallRequest}
+              disabled={isSubmittingCallRequest}
+              className={`w-full py-4 rounded-lg font-semibold transition-all duration-300 
+                        flex items-center justify-center gap-2
+                        ${isSubmittingCallRequest 
+                          ? 'bg-gray-700 text-gray-400 cursor-wait' 
+                          : 'bg-green-600 hover:bg-green-500 text-white shadow-md hover:shadow-green-600/30'}`}
+            >
+              {isSubmittingCallRequest ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  A pedir chamada...
+                </>
+              ) : (
+                <>
+                  <span>Pedir Chamada Agora</span>
+                </>
+              )}
+            </button>
+            
+            {responseMessage && callRequestSuccess === false && (
+              <div className="mt-4 p-3 bg-red-900/40 border border-red-800 rounded-lg text-red-200 text-sm">
+                {responseMessage}
+              </div>
             )}
-          </button>
-
-          {responseMessage && (
-            <div className={`mt-4 text-center text-sm p-3 rounded-md ${callRequestSuccess === true ? 'bg-green-700/50 text-green-200 border border-green-600' : callRequestSuccess === false ? 'bg-red-700/50 text-red-200 border border-red-600' : 'hidden'}`}>
-              {responseMessage}
+          </div>
+          
+          {/* Step 4: Success State */}
+          <div data-step="4" className="p-6" style={{ display: 'none' }}>
+            <div className="flex flex-col items-center text-center">
+              <div className="w-20 h-20 rounded-full bg-green-600/20 border-4 border-green-500 flex items-center justify-center mb-6">
+                <FaCheck size={30} className="text-green-400" />
+              </div>
+              
+              <h3 className="text-2xl font-semibold text-white mb-4">Pedido Enviado com Sucesso!</h3>
+              <p className="text-gray-300 mb-8">
+                Irá receber uma chamada em breve no número +351 {phoneNumber}.
+              </p>
+              
+              <div className="w-full bg-gray-800/60 rounded-lg p-4 mb-8 border border-gray-700">
+                <div className="mb-3">
+                  <div className="animate-pulse flex space-x-4 mb-5">
+                    <div className="flex-1 space-y-3 py-1">
+                      <div className="h-2 bg-green-500/40 rounded w-3/4"></div>
+                      <div className="h-2 bg-green-500/20 rounded w-1/2"></div>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-400">A conectar agente para a sua chamada...</p>
+                </div>
+                
+                <div className="w-full bg-gray-900/60 h-1 mb-1">
+                  <div 
+                    className="h-full bg-green-500 animate-[progressBar_3s_ease-in-out_infinite]"
+                    style={{ width: '60%' }}
+                  ></div>
+                </div>
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>Preparando</span>
+                  <span>Chamando</span>
+                </div>
+              </div>
+              
+              <button 
+                onClick={() => setIsAgentPanelVisible(false)}
+                className="px-8 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors"
+              >
+                Fechar
+              </button>
             </div>
-          )}
-
+          </div>
         </div>
 
       </div>
