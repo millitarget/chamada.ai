@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
  * API route for starting a call
  * In development: always proxies to Python backend
  * In production: connects to the Python backend on Digital Ocean
+ * Also sends data to make.com webhook
  */
 export async function POST(request: Request) {
   try {
@@ -18,6 +19,40 @@ export async function POST(request: Request) {
         { error: 'Missing required fields: phone_number and persona are required' },
         { status: 400 }
       );
+    }
+    
+    // Send data to make.com webhook
+    const makeWebhookUrl = process.env.MAKE_WEBHOOK_URL;
+    if (makeWebhookUrl) {
+      try {
+        console.log('Sending data to make.com webhook');
+        
+        // Send the data to make.com
+        const makeResponse = await fetch(makeWebhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            phone_number: data.phone_number,
+            persona: data.persona,
+            customer_name: data.customer_name || 'Website User',
+            timestamp: new Date().toISOString(),
+            source: 'website_form'
+          }),
+        });
+        
+        if (!makeResponse.ok) {
+          console.error(`Webhook error: ${makeResponse.status}`);
+        } else {
+          console.log('Data successfully sent to make.com webhook');
+        }
+      } catch (webhookError) {
+        // Log the error but continue with the normal flow
+        console.error('Error sending data to make.com webhook:', webhookError);
+      }
+    } else {
+      console.warn('No MAKE_WEBHOOK_URL environment variable found. Skipping webhook call.');
     }
     
     // For development: Connect to local Python backend
