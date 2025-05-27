@@ -238,6 +238,15 @@ async def get_system_prompt(metadata: Dict[str, Any]) -> str:
     persona = metadata.get("persona", "default")
     log.info(f"Building system prompt for persona: {persona}")
     
+    # Handle custom persona - use user's prompt directly
+    if persona == "custom":
+        custom_prompt = metadata.get("custom_prompt", "")
+        if custom_prompt:
+            log.info("Using custom user-provided prompt")
+            return custom_prompt
+        else:
+            log.warning("Custom persona requested but no custom_prompt provided, falling back to default")
+    
     # Initial data that might be needed for certain personas (could be expanded)
     initial_data = {}
     
@@ -257,6 +266,10 @@ async def get_initial_greeting(metadata: Dict[str, Any]) -> str:
     """
     persona = metadata.get("persona", "default")
     log.info(f"Building greeting for persona: {persona}")
+    
+    # Handle custom persona - simple generic greeting
+    if persona == "custom":
+        return "Olá!"
     
     if persona == "clinica" or persona == "dentist":
         return await build_clinic_greeting(metadata)

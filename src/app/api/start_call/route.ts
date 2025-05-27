@@ -61,6 +61,14 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Validate custom prompt if custom persona is selected
+    if (data.persona === 'custom' && !data.custom_prompt?.trim()) {
+      return NextResponse.json(
+        { error: 'Custom prompt is required when using custom persona' },
+        { status: 400 }
+      );
+    }
     
     // Send data to make.com webhook
     const makeWebhookUrl = process.env.MAKE_WEBHOOK_URL;
@@ -78,6 +86,7 @@ export async function POST(request: NextRequest) {
             phone_number: data.phone_number,
             persona: data.persona,
             customer_name: data.customer_name || 'Website User',
+            custom_prompt: data.custom_prompt || null,
             timestamp: new Date().toISOString(),
             source: 'website_form'
           }),

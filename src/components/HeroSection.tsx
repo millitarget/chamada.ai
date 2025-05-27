@@ -5,7 +5,7 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import VantaBackground from './VantaBackground';
 import Image from 'next/image';
-import { FaCheck, FaUtensils, FaTeeth, FaShoppingBag, FaChevronRight, FaChevronLeft, FaPhone } from 'react-icons/fa'; 
+import { FaCheck, FaUtensils, FaTeeth, FaShoppingBag, FaChevronRight, FaChevronLeft, FaPhone, FaRobot } from 'react-icons/fa'; 
 import Flag from 'react-world-flags';
 
 if (typeof window !== 'undefined') {
@@ -41,6 +41,7 @@ const HeroNew: React.FC = () => {
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [customerName, setCustomerName] = useState<string>("");
+  const [customPrompt, setCustomPrompt] = useState("");
   const [isSubmittingCallRequest, setIsSubmittingCallRequest] = useState(false);
   const [callRequestSuccess, setCallRequestSuccess] = useState<boolean | null>(null);
   const [responseMessage, setResponseMessage] = useState<string>("");
@@ -194,6 +195,7 @@ const HeroNew: React.FC = () => {
         setSelectedAgent(null);
         setPhoneNumber("");
         setCustomerName("");
+        setCustomPrompt("");
         setResponseMessage("");
         setCallRequestSuccess(null);
         setFormErrors({});
@@ -463,6 +465,10 @@ const HeroNew: React.FC = () => {
     setCustomerName(event.target.value);
   };
 
+  const handleCustomPromptChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setCustomPrompt(event.target.value);
+  };
+
   const goToNextStep = () => {
     // Validate before moving to next step
     if (currentStep === 2) {
@@ -485,6 +491,7 @@ const HeroNew: React.FC = () => {
     setSelectedAgent(null);
     setPhoneNumber("");
     setCustomerName("");
+    setCustomPrompt("");
     setResponseMessage("");
     setCallRequestSuccess(null);
     setFormErrors({});
@@ -504,6 +511,13 @@ const HeroNew: React.FC = () => {
       return;
     }
 
+    // Validate custom prompt if custom agent is selected
+    if (selectedAgent === "custom" && !customPrompt.trim()) {
+      setResponseMessage("Por favor, descreva o agente personalizado.");
+      setCallRequestSuccess(false);
+      return;
+    }
+
     setIsSubmittingCallRequest(true);
     setResponseMessage(""); // Clear previous messages
     setCallRequestSuccess(null);
@@ -512,16 +526,23 @@ const HeroNew: React.FC = () => {
       // Use relative URL that works in both development and production
       const backendUrl = '/api/start_call';
       
+      const requestBody: any = {
+        phone_number: "+351" + phoneNumber,
+        persona: selectedAgent,
+        customer_name: customerName || "Website User", // Send default if empty
+      };
+
+      // Add custom prompt if custom persona is selected
+      if (selectedAgent === "custom") {
+        requestBody.custom_prompt = customPrompt;
+      }
+      
       const response = await fetch(backendUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          phone_number: "+351" + phoneNumber,
-          persona: selectedAgent,
-          customer_name: customerName || "Website User", // Send default if empty
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const result = await response.json();
@@ -561,6 +582,12 @@ const HeroNew: React.FC = () => {
       name: "Vendedor", 
       description: "Agente para assistência de vendas, informações sobre produtos e resolução de problemas com pedidos.",
       icon: <FaShoppingBag size={28} />
+    },
+    { 
+      id: "custom", 
+      name: "Agente Personalizado", 
+      description: "Crie o seu próprio agente divertido! Descreva quem é e qual o propósito da chamada.",
+      icon: <FaRobot size={28} />
     }
   ];
 
@@ -745,6 +772,31 @@ const HeroNew: React.FC = () => {
               </div>
               <p className="text-gray-500 text-xs mt-2 ml-1 font-light">Usaremos este nome durante a chamada</p>
             </div>
+
+            {/* Custom Prompt Input (Only for custom persona) */}
+            {selectedAgent === "custom" && (
+              <div className="mb-8">
+                <label htmlFor="customPrompt" className="block text-sm font-medium text-gray-300 mb-2 ml-1">
+                  Descreve quem é o agente e o propósito da chamada
+                </label>
+                <div className="relative">
+                  <textarea 
+                    id="customPrompt" 
+                    name="customPrompt" 
+                    value={customPrompt}
+                    onChange={handleCustomPromptChange}
+                    placeholder="Exemplo: És uma professora e estás a ligar à mãe da Joana para lhe dizer que a filha foi suspensa"
+                    rows={3}
+                    className="w-full px-4 py-4 bg-gray-800/80 border-2 border-gray-700 rounded-lg 
+                             focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all 
+                             duration-300 text-white text-lg resize-none"
+                    required={selectedAgent === "custom"}
+                  />
+                  <div className="absolute inset-0 pointer-events-none border-2 border-transparent rounded-lg"></div>
+                </div>
+                <p className="text-gray-500 text-xs mt-2 ml-1 font-light">Seja criativo! O agente seguirá exatamente a sua descrição.</p>
+              </div>
+            )}
             
             <button 
               onClick={handleSubmitCallRequest}

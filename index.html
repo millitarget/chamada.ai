@@ -31,7 +31,12 @@
                     <option value="restaurante">Restaurante</option>
                     <option value="clinica_dentaria">Clínica Dentária</option>
                     <option value="vendedor">Vendedor</option>
+                    <option value="custom">Agente Personalizado</option>
                 </select>
+            </div>
+            <div id="customPromptDiv" style="display:none;">
+                <label for="custom_prompt">Descreve quem é o agente e o propósito da chamada:</label>
+                <textarea id="custom_prompt" name="custom_prompt" rows="3" placeholder="Exemplo: És uma professora e estás a ligar à mãe da Joana para lhe dizer que a filha foi suspensa"></textarea>
             </div>
             <div>
                 <label for="customer_name">Seu Nome (Opcional):</label>
@@ -43,12 +48,28 @@
     </div>
 
     <script>
+        // Show/hide custom prompt based on persona selection
+        document.getElementById('persona').addEventListener('change', function() {
+            const customPromptDiv = document.getElementById('customPromptDiv');
+            const customPromptTextarea = document.getElementById('custom_prompt');
+            
+            if (this.value === 'custom') {
+                customPromptDiv.style.display = 'block';
+                customPromptTextarea.required = true;
+            } else {
+                customPromptDiv.style.display = 'none';
+                customPromptTextarea.required = false;
+                customPromptTextarea.value = '';
+            }
+        });
+
         document.getElementById('callAgentForm').addEventListener('submit', async function(event) {
             event.preventDefault();
 
             const phoneNumber = document.getElementById('phone_number').value;
             const persona = document.getElementById('persona').value;
             const customerName = document.getElementById('customer_name').value;
+            const customPrompt = document.getElementById('custom_prompt').value;
             const responseMessageDiv = document.getElementById('responseMessage');
 
             responseMessageDiv.style.display = 'none';
@@ -62,19 +83,34 @@
                 return;
             }
 
+            // Validate custom prompt if custom persona is selected
+            if (persona === 'custom' && !customPrompt.trim()) {
+                responseMessageDiv.textContent = 'Por favor, descreva o agente personalizado.';
+                responseMessageDiv.classList.add('error');
+                responseMessageDiv.style.display = 'block';
+                return;
+            }
+
             const backendUrl = 'http://localhost:5001/api/start_call'; // URL of your Flask backend in website_backend.py
 
             try {
+                const requestBody = {
+                    phone_number: phoneNumber,
+                    persona: persona,
+                    customer_name: customerName
+                };
+
+                // Add custom prompt if custom persona is selected
+                if (persona === 'custom') {
+                    requestBody.custom_prompt = customPrompt;
+                }
+
                 const response = await fetch(backendUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        phone_number: phoneNumber,
-                        persona: persona,
-                        customer_name: customerName
-                    }),
+                    body: JSON.stringify(requestBody),
                 });
 
                 const result = await response.json();
