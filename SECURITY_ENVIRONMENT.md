@@ -42,7 +42,7 @@ ELEVEN_AGENT_PHONE_NUMBER_ID=your_NEW_phone_number_id
 # SECURITY CONFIGURATION (REQUIRED FOR PRODUCTION)
 # ============================================================================
 # Generate with: openssl rand -hex 32
-PRODUCTION_API_KEY=your_32_character_random_api_key
+PRODUCTION_API_KEY=703398C0DDDD4FDB12C64524374C2CCAC85D86715BC106EFCFCBA8E93744B04F
 
 # CORS allowed origins (comma-separated)
 ALLOWED_ORIGINS=http://localhost:3000,https://your-domain.com,https://your-app.vercel.app
@@ -54,7 +54,7 @@ RATE_LIMIT_WINDOW=86400
 # ============================================================================
 # WEBHOOK CONFIGURATION (OPTIONAL)
 # ============================================================================
-MAKE_WEBHOOK_URL=https://hook.eu1.make.com/your_webhook_id
+MAKE_WEBHOOK_URL=https://hook.eu2.make.com/7mi32f1hxbwr663iwd9dtw2aar17kzdc
 MAKE_WEBHOOK_SECRET=your_webhook_secret_for_auth
 WEBHOOK_TIMEOUT=30
 WEBHOOK_RETRIES=3
@@ -62,7 +62,7 @@ WEBHOOK_RETRIES=3
 # ============================================================================
 # DATABASE CONFIGURATION (OPTIONAL - FOR ADVANCED RATE LIMITING)
 # ============================================================================
-# Supabase configuration for rate limiting
+# ⚠️ THESE ARE SAFE TO EXPOSE: Supabase anon keys are designed for client-side use
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
@@ -73,10 +73,14 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 FLASK_ENV=development
 
 # Production backend URL (for Vercel -> Digital Ocean)
-PRODUCTION_API_URL=https://your-server.com/api/start_call
+PRODUCTION_API_URL=http://your-digital-ocean-ip:5001/api/start_call
 
-# Development backend URL (for local testing)
-NEXT_PUBLIC_API_BASE_URL=http://localhost:5001
+# ============================================================================
+# ❌ REMOVED: Previously exposed variables (SECURITY FIX)
+# ============================================================================
+# NEXT_PUBLIC_API_BASE_URL - Removed: Backend URLs should not be exposed
+# NEXT_PUBLIC_CSRF_TOKEN - Removed: CSRF tokens should not be exposed
+# These are now handled server-side only for security
 ```
 
 ## 🛡️ **SECURITY FIXES IMPLEMENTED**
@@ -126,13 +130,19 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:5001
 
 ### **Environment Variable Security**
 ```bash
-# ✅ SECURE: Server-side only
+# ✅ SECURE: Server-side only (NEVER exposed to client)
 ELEVENLABS_API_KEY=sk_...
 PRODUCTION_API_KEY=...
+LIVEKIT_API_SECRET=...
+MAKE_WEBHOOK_URL=...
 
-# ⚠️ EXPOSED: Client-side visible (use carefully)
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+# ✅ SAFE TO EXPOSE: Designed for client-side use
+NEXT_PUBLIC_SUPABASE_URL=...      # Supabase URLs are safe to expose
+NEXT_PUBLIC_SUPABASE_ANON_KEY=... # Anon keys are designed for client-side
+
+# ❌ REMOVED: Previously exposed (SECURITY FIX)
+# NEXT_PUBLIC_CSRF_TOKEN - CSRF tokens should NEVER be exposed
+# NEXT_PUBLIC_API_BASE_URL - Backend URLs should not be exposed
 ```
 
 ### **API Key Generation**

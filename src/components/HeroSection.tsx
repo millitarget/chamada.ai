@@ -520,7 +520,7 @@ const HeroNew: React.FC = () => {
         body: JSON.stringify({
           phone_number: "+351" + phoneNumber,
           persona: selectedAgent,
-          customer_name: customerName || "Website User" // Send default if empty
+          customer_name: customerName || "Website User", // Send default if empty
         }),
       });
 

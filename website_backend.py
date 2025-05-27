@@ -134,16 +134,28 @@ def run_async(coro):
 def start_call():
     try:
         # ✅ SECURITY FIX: API Key authentication for production
+        log.info(f"DEBUG - start_call() called, REQUIRE_API_KEY = {REQUIRE_API_KEY}")
+        
         if REQUIRE_API_KEY:
+            log.info("DEBUG - API key authentication is REQUIRED")
             auth_header = request.headers.get('Authorization')
+            log.info(f"DEBUG - Authorization header: {auth_header[:20] + '...' if auth_header else 'None'}")
+            
             if not auth_header or not auth_header.startswith('Bearer '):
                 log.warning("Missing or invalid Authorization header")
                 return jsonify({"error": "Authentication required"}), 401
             
             provided_key = auth_header.replace('Bearer ', '')
+            log.info(f"DEBUG - Provided key length: {len(provided_key) if provided_key else 0}")
+            log.info(f"DEBUG - Expected key length: {len(PRODUCTION_API_KEY) if PRODUCTION_API_KEY else 0}")
+            
             if not PRODUCTION_API_KEY or provided_key != PRODUCTION_API_KEY:
                 log.warning("Invalid API key provided")
                 return jsonify({"error": "Invalid authentication"}), 401
+            
+            log.info("DEBUG - API key authentication PASSED")
+        else:
+            log.info("DEBUG - API key authentication is NOT required")
 
         # ✅ SECURITY: Rate limiting
         client_ip = get_client_ip()

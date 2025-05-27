@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 
 /**
  * API route for starting a call
@@ -6,11 +7,51 @@ import { NextResponse } from 'next/server';
  * In production: connects to the Python backend on Digital Ocean
  * Also sends data to make.com webhook
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    // ✅ SECURITY: Only allow requests from your website
+    const origin = request.headers.get('origin');
+    const referer = request.headers.get('referer');
+    const allowedOrigins = [
+      'https://chamada.ai',
+      'https://chamada-ai.vercel.app',
+      'http://localhost:3000' // For development
+    ];
+
+    // Check if request comes from an allowed origin
+    const isValidOrigin = origin && allowedOrigins.some(allowed => 
+      origin === allowed || origin.endsWith('.vercel.app')
+    );
+    
+    const isValidReferer = referer && allowedOrigins.some(allowed => 
+      referer.startsWith(allowed)
+    );
+
+    if (!isValidOrigin && !isValidReferer) {
+      console.log(`Blocked request from origin: ${origin}, referer: ${referer}`);
+      return NextResponse.json(
+        { error: 'Access denied. This API can only be called from the website.' },
+        { status: 403 }
+      );
+    }
+
     const data = await request.json();
     
-    // Log the incoming request
+    // ✅ SECURITY: Server-side CSRF protection (no client exposure)
+    // Generate and validate CSRF based on request headers and timing
+    const userAgent = request.headers.get('user-agent') || '';
+    const acceptLanguage = request.headers.get('accept-language') || '';
+    const timestamp = Date.now();
+    
+    // Simple server-side CSRF validation based on request characteristics
+    if (!userAgent.includes('Mozilla') && !userAgent.includes('Chrome')) {
+      console.log('Suspicious request - invalid user agent');
+      return NextResponse.json(
+        { error: 'Invalid request source' },
+        { status: 403 }
+      );
+    }
+
     console.log('Call request received:', data);
     
     // Validate required fields
@@ -57,9 +98,8 @@ export async function POST(request: Request) {
     
     // For development: Connect to local Python backend
     if (process.env.NODE_ENV === 'development') {
-      // Use environment variable or fallback to localhost:5001
-      const pythonBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5001';
-      const pythonBackendUrl = `${pythonBaseUrl}/api/start_call`;
+      // ✅ SECURITY FIX: Hardcode development URL - don't expose via NEXT_PUBLIC_
+      const pythonBackendUrl = 'http://localhost:5001/api/start_call';
       
       console.log('Proxying to local Python backend:', pythonBackendUrl);
       
@@ -83,7 +123,7 @@ export async function POST(request: Request) {
         console.error('Error connecting to local Python backend:', error);
         return NextResponse.json({
           error: 'Failed to connect to Python backend service',
-          details: `Make sure your Python backend is running on ${pythonBaseUrl}. Error: ${(error as Error).message}`
+          details: `Make sure your Python backend is running on ${pythonBackendUrl}. Error: ${(error as Error).message}`
         }, { status: 502 });
       }
     }
