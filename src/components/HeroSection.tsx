@@ -42,6 +42,13 @@ const HeroNew: React.FC = () => {
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [customerName, setCustomerName] = useState<string>("");
   const [customPrompt, setCustomPrompt] = useState("");
+  
+  // New custom agent fields
+  const [customAgentIdentity, setCustomAgentIdentity] = useState("");
+  const [customCallTarget, setCustomCallTarget] = useState("");
+  const [customReason, setCustomReason] = useState("");
+  const [customAccent, setCustomAccent] = useState("padrão");
+  
   const [isSubmittingCallRequest, setIsSubmittingCallRequest] = useState(false);
   const [callRequestSuccess, setCallRequestSuccess] = useState<boolean | null>(null);
   const [responseMessage, setResponseMessage] = useState<string>("");
@@ -469,6 +476,22 @@ const HeroNew: React.FC = () => {
     setCustomPrompt(event.target.value);
   };
 
+  const handleCustomAgentIdentityChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomAgentIdentity(event.target.value);
+  };
+
+  const handleCustomCallTargetChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomCallTarget(event.target.value);
+  };
+
+  const handleCustomReasonChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setCustomReason(event.target.value);
+  };
+
+  const handleCustomAccentChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setCustomAccent(event.target.value);
+  };
+
   const goToNextStep = () => {
     // Validate before moving to next step
     if (currentStep === 2) {
@@ -492,6 +515,10 @@ const HeroNew: React.FC = () => {
     setPhoneNumber("");
     setCustomerName("");
     setCustomPrompt("");
+    setCustomAgentIdentity("");
+    setCustomCallTarget("");
+    setCustomReason("");
+    setCustomAccent("padrão");
     setResponseMessage("");
     setCallRequestSuccess(null);
     setFormErrors({});
@@ -512,8 +539,8 @@ const HeroNew: React.FC = () => {
     }
 
     // Validate custom prompt if custom agent is selected
-    if (selectedAgent === "custom" && !customPrompt.trim()) {
-      setResponseMessage("Por favor, descreva o agente personalizado.");
+    if (selectedAgent === "custom" && (!customAgentIdentity.trim() || !customCallTarget.trim() || !customReason.trim())) {
+      setResponseMessage("Por favor, preencha todos os campos obrigatórios do agente personalizado.");
       setCallRequestSuccess(false);
       return;
     }
@@ -534,7 +561,10 @@ const HeroNew: React.FC = () => {
 
       // Add custom prompt if custom persona is selected
       if (selectedAgent === "custom") {
-        requestBody.custom_prompt = customPrompt;
+        requestBody.custom_agent_identity = customAgentIdentity;
+        requestBody.custom_call_target = customCallTarget;
+        requestBody.custom_reason = customReason;
+        requestBody.custom_accent = customAccent;
       }
       
       const response = await fetch(backendUrl, {
@@ -773,28 +803,94 @@ const HeroNew: React.FC = () => {
               <p className="text-gray-500 text-xs mt-2 ml-1 font-light">Usaremos este nome durante a chamada</p>
             </div>
 
-            {/* Custom Prompt Input (Only for custom persona) */}
+            {/* Custom Agent Fields (Only for custom persona) */}
             {selectedAgent === "custom" && (
-              <div className="mb-8">
-                <label htmlFor="customPrompt" className="block text-sm font-medium text-gray-300 mb-2 ml-1">
-                  Descreve quem é o agente e o propósito da chamada
-                </label>
-                <div className="relative">
-                  <textarea 
-                    id="customPrompt" 
-                    name="customPrompt" 
-                    value={customPrompt}
-                    onChange={handleCustomPromptChange}
-                    placeholder="Exemplo: És uma professora e estás a ligar à mãe da Joana para lhe dizer que a filha foi suspensa"
-                    rows={3}
-                    className="w-full px-4 py-4 bg-gray-800/80 border-2 border-gray-700 rounded-lg 
+              <div className="mb-8 space-y-6">
+                <h4 className="text-lg font-medium text-white mb-4">Configure o Seu Agente Personalizado</h4>
+                
+                {/* 1. Agent Identity */}
+                <div>
+                  <label htmlFor="customAgentIdentity" className="block text-sm font-medium text-gray-300 mb-2 ml-1">
+                    1. Quem é o agente? *
+                  </label>
+                  <input 
+                    type="text"
+                    id="customAgentIdentity" 
+                    name="customAgentIdentity" 
+                    value={customAgentIdentity}
+                    onChange={handleCustomAgentIdentityChange}
+                    placeholder="Ex: Marta, a diretora de turma do 5º ano B"
+                    className="w-full px-4 py-3 bg-gray-800/80 border-2 border-gray-700 rounded-lg 
                              focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all 
-                             duration-300 text-white text-lg resize-none"
+                             duration-300 text-white text-base"
                     required={selectedAgent === "custom"}
                   />
-                  <div className="absolute inset-0 pointer-events-none border-2 border-transparent rounded-lg"></div>
                 </div>
-                <p className="text-gray-500 text-xs mt-2 ml-1 font-light">Seja criativo! O agente seguirá exatamente a sua descrição.</p>
+
+                {/* 2. Call Target */}
+                <div>
+                  <label htmlFor="customCallTarget" className="block text-sm font-medium text-gray-300 mb-2 ml-1">
+                    2. Estás a ligar para quem? *
+                  </label>
+                  <input 
+                    type="text"
+                    id="customCallTarget" 
+                    name="customCallTarget" 
+                    value={customCallTarget}
+                    onChange={handleCustomCallTargetChange}
+                    placeholder="Ex: para a Ana que é mãe do Martim"
+                    className="w-full px-4 py-3 bg-gray-800/80 border-2 border-gray-700 rounded-lg 
+                             focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all 
+                             duration-300 text-white text-base"
+                    required={selectedAgent === "custom"}
+                  />
+                </div>
+
+                {/* 3. Reason */}
+                <div>
+                  <label htmlFor="customReason" className="block text-sm font-medium text-gray-300 mb-2 ml-1">
+                    3. Motivo da chamada *
+                  </label>
+                  <textarea 
+                    id="customReason" 
+                    name="customReason" 
+                    value={customReason}
+                    onChange={handleCustomReasonChange}
+                    placeholder="Ex: o Martim tirou negativa a matemática e está em risco de reprovar o ano e estás a ligar para perceber se a mãe tem notado alguma coisa diferente no filho e como vão resolver a situação"
+                    rows={3}
+                    className="w-full px-4 py-3 bg-gray-800/80 border-2 border-gray-700 rounded-lg 
+                             focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all 
+                             duration-300 text-white text-base resize-none"
+                    required={selectedAgent === "custom"}
+                  />
+                </div>
+
+                {/* 4. Accent */}
+                <div>
+                  <label htmlFor="customAccent" className="block text-sm font-medium text-gray-300 mb-2 ml-1">
+                    4. Sotaque
+                  </label>
+                  <select 
+                    id="customAccent" 
+                    name="customAccent" 
+                    value={customAccent}
+                    onChange={handleCustomAccentChange}
+                    className="w-full px-4 py-3 bg-gray-800/80 border-2 border-gray-700 rounded-lg 
+                             focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all 
+                             duration-300 text-white text-base"
+                  >
+                    <option value="padrão">Padrão (Lisboa)</option>
+                    <option value="norte">Norte (Porto, Braga)</option>
+                    <option value="centro">Centro (Coimbra, Aveiro)</option>
+                    <option value="sul">Sul (Algarve)</option>
+                    <option value="açores">Açores</option>
+                    <option value="madeira">Madeira</option>
+                  </select>
+                </div>
+
+                <p className="text-gray-500 text-xs ml-1 font-light">
+                  * Campos obrigatórios. O agente será automaticamente configurado para soar humano e natural.
+                </p>
               </div>
             )}
             

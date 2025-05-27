@@ -62,12 +62,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate custom prompt if custom persona is selected
-    if (data.persona === 'custom' && !data.custom_prompt?.trim()) {
-      return NextResponse.json(
-        { error: 'Custom prompt is required when using custom persona' },
-        { status: 400 }
-      );
+    // Validate custom agent fields if custom persona is selected
+    if (data.persona === 'custom') {
+      if (!data.custom_agent_identity?.trim() || !data.custom_call_target?.trim() || !data.custom_reason?.trim()) {
+        return NextResponse.json(
+          { error: 'All custom agent fields are required when using custom persona' },
+          { status: 400 }
+        );
+      }
     }
     
     // Send data to make.com webhook
@@ -86,7 +88,10 @@ export async function POST(request: NextRequest) {
             phone_number: data.phone_number,
             persona: data.persona,
             customer_name: data.customer_name || 'Website User',
-            custom_prompt: data.custom_prompt || null,
+            custom_agent_identity: data.custom_agent_identity || null,
+            custom_call_target: data.custom_call_target || null,
+            custom_reason: data.custom_reason || null,
+            custom_accent: data.custom_accent || 'padrão',
             timestamp: new Date().toISOString(),
             source: 'website_form'
           }),

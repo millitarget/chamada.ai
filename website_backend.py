@@ -194,14 +194,37 @@ def start_call():
             customer_name = validate_customer_name(data.get('customer_name', ''))
             
             # Handle custom persona
-            custom_prompt = None
+            custom_agent_data = None
             if persona == "custom":
-                custom_prompt = data.get('custom_prompt', '').strip()
-                if not custom_prompt:
-                    raise ValueError("Custom prompt is required when using custom persona")
-                if len(custom_prompt) > 500:  # Reasonable limit
-                    raise ValueError("Custom prompt too long (max 500 characters)")
-                    
+                # Get structured custom agent fields
+                agent_identity = data.get('custom_agent_identity', '').strip()
+                call_target = data.get('custom_call_target', '').strip()
+                reason = data.get('custom_reason', '').strip()
+                accent = data.get('custom_accent', 'padrão').strip()
+                
+                # Validate required fields
+                if not agent_identity:
+                    raise ValueError("Agent identity is required for custom persona")
+                if not call_target:
+                    raise ValueError("Call target is required for custom persona")
+                if not reason:
+                    raise ValueError("Reason is required for custom persona")
+                
+                # Validate field lengths
+                if len(agent_identity) > 200:
+                    raise ValueError("Agent identity too long (max 200 characters)")
+                if len(call_target) > 200:
+                    raise ValueError("Call target too long (max 200 characters)")
+                if len(reason) > 500:
+                    raise ValueError("Reason too long (max 500 characters)")
+                
+                custom_agent_data = {
+                    'agent_identity': agent_identity,
+                    'call_target': call_target,
+                    'reason': reason,
+                    'accent': accent
+                }
+            
         except ValueError as e:
             log.warning(f"Invalid input from IP {client_ip}: {str(e)}")
             return jsonify({"error": str(e)}), 400
@@ -210,7 +233,7 @@ def start_call():
         log.info(f"Valid call request from IP: {client_ip}, Persona: {persona}")
 
         # Run async function to handle LiveKit API calls
-        result = run_async(handle_livekit_call(persona, phone_number, customer_name, custom_prompt))
+        result = run_async(handle_livekit_call(persona, phone_number, customer_name, custom_agent_data))
         return jsonify(result), 200
         
     except Exception as e:
@@ -220,7 +243,7 @@ def start_call():
             "message": "Please try again later"
         }), 500
 
-async def handle_livekit_call(persona, phone_number, customer_name, custom_prompt=None):
+async def handle_livekit_call(persona, phone_number, customer_name, custom_agent_data=None):
     """
     Handles the async LiveKit API calls using proper session management.
     """
@@ -241,13 +264,10 @@ async def handle_livekit_call(persona, phone_number, customer_name, custom_promp
             "phone_number": phone_number,
             "persona": persona,
             "customer_name": customer_name,
-            "website_request_id": str(uuid4())
+            "website_request_id": str(uuid4()),
+            "custom_agent_data": custom_agent_data
         }
         
-        # Add custom prompt if provided
-        if custom_prompt:
-            job_metadata["custom_prompt"] = custom_prompt
-            
         metadata_str = json.dumps(job_metadata)
         log.info(f"Dispatching job for persona: {persona}")
 

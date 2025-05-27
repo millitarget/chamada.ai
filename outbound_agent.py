@@ -120,6 +120,54 @@ async def build_common_greeting(metadata: Dict[str, Any]) -> str:
     greeting = f"{greeting_intro}! Sou o {persona_display_name}, o seu {persona_key} virtual para esta demonstração. Em que posso ser útil hoje?"
     return greeting
 
+def build_custom_agent_prompt(custom_agent_data: Dict[str, Any]) -> str:
+    """
+    Builds a comprehensive system prompt from structured custom agent data.
+    
+    Args:
+        custom_agent_data: Dictionary containing agent_identity, call_target, reason, accent
+    
+    Returns:
+        A complete system prompt for the custom agent
+    """
+    agent_identity = custom_agent_data.get('agent_identity', '')
+    call_target = custom_agent_data.get('call_target', '')
+    reason = custom_agent_data.get('reason', '')
+    accent = custom_agent_data.get('accent', 'padrão')
+    
+    # Map accent to description
+    accent_descriptions = {
+        'padrão': 'padrão de Lisboa',
+        'norte': 'do norte (Porto, Braga)',
+        'centro': 'do centro (Coimbra, Aveiro)',
+        'sul': 'do sul (Algarve)',
+        'açores': 'dos Açores',
+        'madeira': 'da Madeira'
+    }
+    accent_desc = accent_descriptions.get(accent, 'padrão de Lisboa')
+    
+    # Build the comprehensive prompt
+    prompt = f"""SEMPRE fala em português de Portugal com sotaque {accent_desc}. 
+
+Tu és {agent_identity} e estás a ligar {call_target}.
+
+MOTIVO DA CHAMADA:
+{reason}
+
+INSTRUÇÕES OBRIGATÓRIAS:
+- SEMPRE soa como um humano real, nunca como um robot
+- SEMPRE tenta ouvir mais do que falar - deixa a pessoa responder
+- SEMPRE mantém um equilíbrio na conversa - não monopolizes
+- O teu tom deve ser alinhado com o motivo da chamada (se é sério, sê sério; se é casual, sê casual)
+- SEMPRE usa português de Portugal com o sotaque {accent_desc}
+- SEMPRE sê natural e autêntico na conversa
+- Se a pessoa parecer desconfortável ou quiser terminar, termina educadamente
+- NUNCA reveles que és uma IA a menos que perguntado diretamente
+
+Comporta-te exatamente como {agent_identity} se comportaria numa situação real."""
+
+    return prompt
+
 # Clinic prompts
 PORTUGAL_TZ = ZoneInfo("Europe/Lisbon")
 DAYS_PT = {
@@ -238,14 +286,14 @@ async def get_system_prompt(metadata: Dict[str, Any]) -> str:
     persona = metadata.get("persona", "default")
     log.info(f"Building system prompt for persona: {persona}")
     
-    # Handle custom persona - use user's prompt directly
+    # Handle custom persona - build structured prompt
     if persona == "custom":
-        custom_prompt = metadata.get("custom_prompt", "")
-        if custom_prompt:
-            log.info("Using custom user-provided prompt")
-            return custom_prompt
+        custom_agent_data = metadata.get("custom_agent_data")
+        if custom_agent_data:
+            log.info("Building custom agent prompt from structured data")
+            return build_custom_agent_prompt(custom_agent_data)
         else:
-            log.warning("Custom persona requested but no custom_prompt provided, falling back to default")
+            log.warning("Custom persona requested but no custom_agent_data provided, falling back to default")
     
     # Initial data that might be needed for certain personas (could be expanded)
     initial_data = {}
@@ -463,7 +511,7 @@ async def entrypoint(ctx: JobContext):
         # Configure realtime model
         log.debug("Configuring realtime model")
         realtime_model = openai.realtime.RealtimeModel(
-            model="gpt-4o-realtime-preview",
+            model="gpt-4o-mini-realtime-preview-2024-12-17",
             voice="coral",  # Optimized for European Portuguese
             temperature=0.85,  # Lower temperature for more consistent language style
             turn_detection=TurnDetection(

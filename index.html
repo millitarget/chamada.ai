@@ -35,8 +35,28 @@
                 </select>
             </div>
             <div id="customPromptDiv" style="display:none;">
-                <label for="custom_prompt">Descreve quem é o agente e o propósito da chamada:</label>
-                <textarea id="custom_prompt" name="custom_prompt" rows="3" placeholder="Exemplo: És uma professora e estás a ligar à mãe da Joana para lhe dizer que a filha foi suspensa"></textarea>
+                <h3>Configure o Seu Agente Personalizado</h3>
+                
+                <label for="custom_agent_identity">1. Quem é o agente? *</label>
+                <input type="text" id="custom_agent_identity" name="custom_agent_identity" placeholder="Ex: Marta, a diretora de turma do 5º ano B" required>
+                
+                <label for="custom_call_target">2. Estás a ligar para quem? *</label>
+                <input type="text" id="custom_call_target" name="custom_call_target" placeholder="Ex: para a Ana que é mãe do Martim" required>
+                
+                <label for="custom_reason">3. Motivo da chamada *</label>
+                <textarea id="custom_reason" name="custom_reason" rows="3" placeholder="Ex: o Martim tirou negativa a matemática e está em risco de reprovar o ano e estás a ligar para perceber se a mãe tem notado alguma coisa diferente no filho e como vão resolver a situação" required></textarea>
+                
+                <label for="custom_accent">4. Sotaque</label>
+                <select id="custom_accent" name="custom_accent">
+                    <option value="padrão">Padrão (Lisboa)</option>
+                    <option value="norte">Norte (Porto, Braga)</option>
+                    <option value="centro">Centro (Coimbra, Aveiro)</option>
+                    <option value="sul">Sul (Algarve)</option>
+                    <option value="açores">Açores</option>
+                    <option value="madeira">Madeira</option>
+                </select>
+                
+                <p style="font-size: 12px; color: #666;">* Campos obrigatórios. O agente será automaticamente configurado para soar humano e natural.</p>
             </div>
             <div>
                 <label for="customer_name">Seu Nome (Opcional):</label>
@@ -48,18 +68,26 @@
     </div>
 
     <script>
-        // Show/hide custom prompt based on persona selection
+        // Show/hide custom fields based on persona selection
         document.getElementById('persona').addEventListener('change', function() {
             const customPromptDiv = document.getElementById('customPromptDiv');
-            const customPromptTextarea = document.getElementById('custom_prompt');
+            const customAgentIdentity = document.getElementById('custom_agent_identity');
+            const customCallTarget = document.getElementById('custom_call_target');
+            const customReason = document.getElementById('custom_reason');
             
             if (this.value === 'custom') {
                 customPromptDiv.style.display = 'block';
-                customPromptTextarea.required = true;
+                customAgentIdentity.required = true;
+                customCallTarget.required = true;
+                customReason.required = true;
             } else {
                 customPromptDiv.style.display = 'none';
-                customPromptTextarea.required = false;
-                customPromptTextarea.value = '';
+                customAgentIdentity.required = false;
+                customCallTarget.required = false;
+                customReason.required = false;
+                customAgentIdentity.value = '';
+                customCallTarget.value = '';
+                customReason.value = '';
             }
         });
 
@@ -69,7 +97,13 @@
             const phoneNumber = document.getElementById('phone_number').value;
             const persona = document.getElementById('persona').value;
             const customerName = document.getElementById('customer_name').value;
-            const customPrompt = document.getElementById('custom_prompt').value;
+            
+            // Get custom agent fields
+            const customAgentIdentity = document.getElementById('custom_agent_identity').value;
+            const customCallTarget = document.getElementById('custom_call_target').value;
+            const customReason = document.getElementById('custom_reason').value;
+            const customAccent = document.getElementById('custom_accent').value;
+            
             const responseMessageDiv = document.getElementById('responseMessage');
 
             responseMessageDiv.style.display = 'none';
@@ -83,9 +117,9 @@
                 return;
             }
 
-            // Validate custom prompt if custom persona is selected
-            if (persona === 'custom' && !customPrompt.trim()) {
-                responseMessageDiv.textContent = 'Por favor, descreva o agente personalizado.';
+            // Validate custom agent fields if custom persona is selected
+            if (persona === 'custom' && (!customAgentIdentity.trim() || !customCallTarget.trim() || !customReason.trim())) {
+                responseMessageDiv.textContent = 'Por favor, preencha todos os campos obrigatórios do agente personalizado.';
                 responseMessageDiv.classList.add('error');
                 responseMessageDiv.style.display = 'block';
                 return;
@@ -97,13 +131,12 @@
                 const requestBody = {
                     phone_number: phoneNumber,
                     persona: persona,
-                    customer_name: customerName
+                    customer_name: customerName,
+                    custom_agent_identity: customAgentIdentity,
+                    custom_call_target: customCallTarget,
+                    custom_reason: customReason,
+                    custom_accent: customAccent
                 };
-
-                // Add custom prompt if custom persona is selected
-                if (persona === 'custom') {
-                    requestBody.custom_prompt = customPrompt;
-                }
 
                 const response = await fetch(backendUrl, {
                     method: 'POST',
