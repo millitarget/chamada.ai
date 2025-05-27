@@ -163,10 +163,69 @@ INSTRUÇÕES OBRIGATÓRIAS:
 - SEMPRE sê natural e autêntico na conversa
 - Se a pessoa parecer desconfortável ou quiser terminar, termina educadamente
 - NUNCA reveles que és uma IA a menos que perguntado diretamente
+- A tua voz deve corresponder ao género do nome ({agent_identity}) - se é nome masculino, voz masculina; se é feminino, voz feminina
 
 Comporta-te exatamente como {agent_identity} se comportaria numa situação real."""
 
     return prompt
+
+def detect_gender_from_name(name: str) -> str:
+    """
+    Detect gender from Portuguese names to select appropriate voice.
+    
+    Args:
+        name: The person's name (can be full name or just first name)
+    
+    Returns:
+        'male' or 'female' based on name analysis
+    """
+    if not name:
+        return 'female'  # Default to female voice
+    
+    # Extract first name (before comma or first word)
+    first_name = name.split(',')[0].strip().split()[0].lower()
+    
+    # Common Portuguese male names
+    male_names = {
+        'joão', 'josé', 'antónio', 'manuel', 'francisco', 'carlos', 'pedro', 'paulo', 'luis', 'miguel',
+        'fernando', 'jorge', 'ricardo', 'bruno', 'andré', 'rui', 'nuno', 'tiago', 'hugo', 'daniel',
+        'rafael', 'david', 'marco', 'sérgio', 'vítor', 'diogo', 'gonçalo', 'rodrigo', 'fábio', 'nelson',
+        'alberto', 'armando', 'eduardo', 'henrique', 'joaquim', 'leonardo', 'marcelo', 'roberto', 'samuel',
+        'alexandre', 'cristiano', 'emanuel', 'gabriel', 'gustavo', 'joão', 'leonardo', 'márcio', 'mário',
+        'martim', 'mateus', 'paulo', 'renato', 'ricardo', 'simão', 'tomás', 'vasco', 'xavier'
+    }
+    
+    # Common Portuguese female names
+    female_names = {
+        'maria', 'ana', 'joana', 'catarina', 'sofia', 'inês', 'beatriz', 'carolina', 'mariana', 'rita',
+        'sara', 'patrícia', 'carla', 'sandra', 'cristina', 'helena', 'isabel', 'paula', 'teresa', 'vera',
+        'alexandra', 'andreia', 'bárbara', 'cláudia', 'diana', 'elisabete', 'fernanda', 'gabriela', 'lúcia',
+        'marta', 'mónica', 'raquel', 'sónia', 'susana', 'vanessa', 'alice', 'amélia', 'ângela', 'célia',
+        'conceição', 'fátima', 'graça', 'leonor', 'liliana', 'manuela', 'natália', 'olívia', 'rosa', 'sílvia'
+    }
+    
+    if first_name in male_names:
+        return 'male'
+    elif first_name in female_names:
+        return 'female'
+    else:
+        # Default to female if name not recognized
+        return 'female'
+
+def get_voice_for_gender(gender: str) -> str:
+    """
+    Get appropriate voice based on gender.
+    
+    Args:
+        gender: 'male' or 'female'
+    
+    Returns:
+        Voice name for OpenAI Realtime API
+    """
+    if gender == 'male':
+        return 'echo'  # Male voice
+    else:
+        return 'coral'  # Female voice (default)
 
 # Clinic prompts
 PORTUGAL_TZ = ZoneInfo("Europe/Lisbon")
@@ -508,11 +567,21 @@ async def entrypoint(ctx: JobContext):
             "job_metadata": metadata
         }
 
+        # Determine appropriate voice based on agent's gender
+        selected_voice = "coral"  # Default female voice
+        if persona == "custom":
+            custom_agent_data = metadata.get("custom_agent_data")
+            if custom_agent_data:
+                agent_identity = custom_agent_data.get('agent_identity', '')
+                detected_gender = detect_gender_from_name(agent_identity)
+                selected_voice = get_voice_for_gender(detected_gender)
+                log.info(f"Agent '{agent_identity}' detected as {detected_gender}, using voice: {selected_voice}")
+        
         # Configure realtime model
         log.debug("Configuring realtime model")
         realtime_model = openai.realtime.RealtimeModel(
             model="gpt-4o-mini-realtime-preview-2024-12-17",
-            voice="coral",  # Optimized for European Portuguese
+            voice=selected_voice,  # Gender-appropriate voice
             temperature=0.85,  # Lower temperature for more consistent language style
             turn_detection=TurnDetection(
                 type="semantic_vad",
