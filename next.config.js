@@ -3,16 +3,21 @@ const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['framer-motion', 'react-icons'],
   
-  // Add CORS headers to API routes
+  // ✅ SECURITY FIX: Restrict CORS to specific origins and methods
   async headers() {
+    // Get allowed origins from environment or use secure defaults
+    const allowedOrigins = process.env.ALLOWED_ORIGINS || 
+      'http://localhost:3000,https://chamada-ai.vercel.app,https://*.vercel.app';
+    
     return [
       {
         source: '/api/:path*',
         headers: [
-          { key: 'Access-Control-Allow-Credentials', value: 'true' },
-          { key: 'Access-Control-Allow-Origin', value: '*' },
-          { key: 'Access-Control-Allow-Methods', value: 'GET,OPTIONS,PATCH,DELETE,POST,PUT' },
-          { key: 'Access-Control-Allow-Headers', value: 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version' },
+          { key: 'Access-Control-Allow-Credentials', value: 'false' }, // ✅ Disable credentials
+          { key: 'Access-Control-Allow-Origin', value: allowedOrigins }, // ✅ Restrict origins
+          { key: 'Access-Control-Allow-Methods', value: 'POST,OPTIONS' }, // ✅ Only allow necessary methods
+          { key: 'Access-Control-Allow-Headers', value: 'Content-Type,Authorization' }, // ✅ Restrict headers
+          { key: 'Access-Control-Max-Age', value: '86400' }, // ✅ Cache preflight for 24h
         ],
       },
     ];

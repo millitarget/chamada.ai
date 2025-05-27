@@ -100,15 +100,24 @@ export async function POST(request: Request) {
     if (productionApiUrl) {
       console.log('Connecting to production backend on Digital Ocean:', productionApiUrl);
       
+      // ✅ SECURITY FIX: Require authentication for production
+      const productionApiKey = process.env.PRODUCTION_API_KEY;
+      if (!productionApiKey) {
+        console.error('PRODUCTION_API_KEY is required for production calls');
+        return NextResponse.json({
+          error: 'Service configuration error',
+          details: 'Production authentication not configured'
+        }, { status: 503 });
+      }
+      
       try {
         const response = await fetch(productionApiUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            // Add authorization if your Digital Ocean server requires it
-            ...(process.env.PRODUCTION_API_KEY && {
-              'Authorization': `Bearer ${process.env.PRODUCTION_API_KEY}`
-            })
+            'Authorization': `Bearer ${productionApiKey}`, // ✅ SECURITY FIX: Mandatory auth
+            'User-Agent': 'ChamadaAI-Frontend/1.0',
+            'X-Request-Source': 'website'
           },
           body: JSON.stringify(data),
         });

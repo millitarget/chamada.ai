@@ -2,7 +2,10 @@ import os
 import json
 import logging
 import asyncio
+import re
 from uuid import uuid4
+from datetime import datetime, timedelta
+from collections import defaultdict
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -30,8 +33,97 @@ if not all([LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET]):
 
 AGENT_NAME = "outbound-agent"
 
+# Security Configuration
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,https://chamada-ai.vercel.app").split(",")
+MAX_REQUESTS_PER_IP = int(os.getenv("MAX_REQUESTS_PER_IP", "3"))
+RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "86400"))  # 24 hours in seconds
+ALLOWED_PERSONAS = ["restaurante", "clinica_dentaria", "vendedor", "clinica", "dentist", "sales"]
+
+# ✅ SECURITY FIX: API Key authentication for production
+PRODUCTION_API_KEY = os.getenv("PRODUCTION_API_KEY")
+REQUIRE_API_KEY = os.getenv("FLASK_ENV") == "production"
+
+# Simple in-memory rate limiting (use Redis in production)
+request_counts = defaultdict(list)
+
 app = Flask(__name__)
-CORS(app)
+# ✅ SECURITY FIX: Restrict CORS to allowed origins only
+CORS(app, origins=ALLOWED_ORIGINS, methods=['POST'], allow_headers=['Content-Type'])
+
+def validate_phone_number(phone: str) -> str:
+    """Validate and sanitize Portuguese phone number"""
+    if not phone:
+        raise ValueError("Phone number is required")
+    
+    # Remove all non-digit characters except +
+    clean_phone = re.sub(r'[^\d+]', '', phone)
+    
+    # Validate Portuguese phone number format
+    if clean_phone.startswith('+351'):
+        if len(clean_phone) != 13:  # +351 + 9 digits
+            raise ValueError("Invalid Portuguese phone number format")
+    elif clean_phone.startswith('351'):
+        if len(clean_phone) != 12:  # 351 + 9 digits
+            raise ValueError("Invalid Portuguese phone number format")
+        clean_phone = '+' + clean_phone
+    elif len(clean_phone) == 9:
+        clean_phone = '+351' + clean_phone
+    else:
+        raise ValueError("Invalid phone number format. Use Portuguese format (+351XXXXXXXXX)")
+    
+    return clean_phone
+
+def validate_persona(persona: str) -> str:
+    """Validate persona against whitelist"""
+    if not persona:
+        raise ValueError("Persona is required")
+    
+    if persona not in ALLOWED_PERSONAS:
+        raise ValueError(f"Invalid persona. Allowed: {', '.join(ALLOWED_PERSONAS)}")
+    
+    return persona
+
+def validate_customer_name(name: str) -> str:
+    """Validate and sanitize customer name"""
+    if not name:
+        return "Website User"
+    
+    # Remove potentially dangerous characters
+    clean_name = re.sub(r'[<>"\']', '', name.strip())
+    
+    if len(clean_name) > 100:
+        raise ValueError("Customer name too long")
+    
+    return clean_name or "Website User"
+
+def check_rate_limit(ip_address: str) -> bool:
+    """Simple rate limiting check"""
+    now = datetime.now()
+    cutoff = now - timedelta(seconds=RATE_LIMIT_WINDOW)
+    
+    # Clean old requests
+    request_counts[ip_address] = [
+        req_time for req_time in request_counts[ip_address] 
+        if req_time > cutoff
+    ]
+    
+    # Check if limit exceeded
+    if len(request_counts[ip_address]) >= MAX_REQUESTS_PER_IP:
+        return False
+    
+    # Add current request
+    request_counts[ip_address].append(now)
+    return True
+
+def get_client_ip():
+    """Get client IP address safely"""
+    # Check for forwarded headers (from proxy/load balancer)
+    if request.headers.get('X-Forwarded-For'):
+        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
+    elif request.headers.get('X-Real-IP'):
+        return request.headers.get('X-Real-IP')
+    else:
+        return request.remote_addr
 
 def run_async(coro):
     loop = asyncio.new_event_loop()
@@ -40,23 +132,58 @@ def run_async(coro):
 
 @app.route('/api/start_call', methods=['POST'])
 def start_call():
-    data = request.get_json()
-    phone_number = data.get('phone_number')
-    persona = data.get('persona')
-    customer_name = data.get('customer_name', 'Website User')
-
-    if not phone_number or not persona:
-        return jsonify({"error": "Phone number and persona are required"}), 400
-
-    log.info(f"Received call request: Phone={phone_number}, Persona={persona}, Name={customer_name}")
-
     try:
+        # ✅ SECURITY FIX: API Key authentication for production
+        if REQUIRE_API_KEY:
+            auth_header = request.headers.get('Authorization')
+            if not auth_header or not auth_header.startswith('Bearer '):
+                log.warning("Missing or invalid Authorization header")
+                return jsonify({"error": "Authentication required"}), 401
+            
+            provided_key = auth_header.replace('Bearer ', '')
+            if not PRODUCTION_API_KEY or provided_key != PRODUCTION_API_KEY:
+                log.warning("Invalid API key provided")
+                return jsonify({"error": "Invalid authentication"}), 401
+
+        # ✅ SECURITY: Rate limiting
+        client_ip = get_client_ip()
+        if not check_rate_limit(client_ip):
+            log.warning(f"Rate limit exceeded for IP: {client_ip}")
+            return jsonify({
+                "error": "Rate limit exceeded", 
+                "message": "Too many requests. Please try again later."
+            }), 429
+
+        # ✅ SECURITY: Validate request data exists
+        if not request.is_json:
+            return jsonify({"error": "Content-Type must be application/json"}), 400
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Request body is required"}), 400
+
+        # ✅ SECURITY: Input validation and sanitization
+        try:
+            phone_number = validate_phone_number(data.get('phone_number'))
+            persona = validate_persona(data.get('persona'))
+            customer_name = validate_customer_name(data.get('customer_name', ''))
+        except ValueError as e:
+            log.warning(f"Invalid input from IP {client_ip}: {str(e)}")
+            return jsonify({"error": str(e)}), 400
+
+        # ✅ SECURITY: Log without sensitive data
+        log.info(f"Valid call request from IP: {client_ip}, Persona: {persona}")
+
         # Run async function to handle LiveKit API calls
         result = run_async(handle_livekit_call(persona, phone_number, customer_name))
         return jsonify(result), 200
+        
     except Exception as e:
-        log.error(f"An unexpected error occurred: {str(e)}", exc_info=True)
-        return jsonify({"error": "An unexpected error occurred", "details": str(e)}), 500
+        log.error(f"Unexpected error: {str(e)}", exc_info=True)
+        return jsonify({
+            "error": "Internal server error", 
+            "message": "Please try again later"
+        }), 500
 
 async def handle_livekit_call(persona, phone_number, customer_name):
     """
@@ -70,11 +197,11 @@ async def handle_livekit_call(persona, phone_number, customer_name):
         room_name = f"call_{persona}_{uuid4().hex[:8]}"
         create_room_request = proto_room.CreateRoomRequest(name=room_name)
         
-        log.info(f"Attempting to create room: {room_name}")
+        log.info(f"Creating room: {room_name}")
         livekit_room = await rs.create_room(create_room_request)
-        log.info(f"Successfully created LiveKit room: {livekit_room.name} (SID: {livekit_room.sid})")
+        log.info(f"✅ LiveKit room created: {livekit_room.name}")
 
-        # Prepare metadata for the agent
+        # Prepare metadata for the agent (without logging sensitive data)
         job_metadata = {
             "phone_number": phone_number,
             "persona": persona,
@@ -82,7 +209,7 @@ async def handle_livekit_call(persona, phone_number, customer_name):
             "website_request_id": str(uuid4())
         }
         metadata_str = json.dumps(job_metadata)
-        log.info(f"Dispatching job with metadata: {metadata_str}")
+        log.info(f"Dispatching job for persona: {persona}")
 
         # Use the AgentDispatchService - a higher-level client that handles protobuf encoding
         agent_client = ad_svc.AgentDispatchService(
@@ -98,7 +225,7 @@ async def handle_livekit_call(persona, phone_number, customer_name):
         
         # Call the service with the proper request object
         dispatched_job = await agent_client.create_dispatch(dispatch_req)
-        log.info(f"Successfully dispatched job {dispatched_job.id} to agent '{AGENT_NAME}' in room '{livekit_room.name}'")
+        log.info(f"✅ Job dispatched: {dispatched_job.id} to agent '{AGENT_NAME}'")
 
         return {
             "message": "Call initiated successfully.",
@@ -108,4 +235,10 @@ async def handle_livekit_call(persona, phone_number, customer_name):
 
 if __name__ == '__main__':
     log.info("Starting Flask backend server for LiveKit call initiation.")
-    app.run(host='0.0.0.0', port=5001, debug=True) 
+    # ✅ SECURITY FIX: Remove debug mode and restrict host in production
+    is_production = os.getenv("FLASK_ENV") == "production"
+    app.run(
+        host='127.0.0.1' if is_production else '0.0.0.0', 
+        port=5001, 
+        debug=False  # Never use debug=True in production
+    ) 

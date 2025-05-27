@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 import json
+import aiohttp
 from datetime import datetime
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
@@ -12,6 +13,7 @@ from livekit.agents import Agent, AgentSession, JobContext, cli, WorkerOptions, 
 from livekit.plugins import openai
 from openai.types.beta.realtime.session import TurnDetection
 from zoneinfo import ZoneInfo
+import hashlib
 
 # ─────────────────────── Configuração inicial ───────────────────────
 load_dotenv(".env.local")
@@ -22,18 +24,33 @@ logging.basicConfig(
 log = logging.getLogger("agent_outbound")
 
 # ─────────────────────── Constantes configuráveis ───────────────────────
-SIP_TRUNK_ID = "ST_SSjcbMkbf6nB"  # Same SIP trunk ID
-CALLER_ID = "+351210607606"  # Twilio number from outbound-trunk.json
+# ✅ SECURITY FIX: Move sensitive values to environment variables
+SIP_TRUNK_ID = os.getenv("SIP_TRUNK_ID", "ST_SSjcbMkbf6nB")  # Should be in .env.local
+CALLER_ID = os.getenv("CALLER_ID", "+351210607606")  # Should be in .env.local
+DEFAULT_FALLBACK_PHONE = os.getenv("DEFAULT_FALLBACK_PHONE", "+351933792547")  # Emergency fallback
 
 # Validate environment variables
 LIVEKIT_URL = os.getenv("LIVEKIT_URL")
 LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY")
 LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET")
 
+# Webhook configuration
+MAKE_WEBHOOK_URL = os.getenv("MAKE_WEBHOOK_URL")
+MAKE_WEBHOOK_SECRET = os.getenv("MAKE_WEBHOOK_SECRET")  # Optional for verification
+WEBHOOK_TIMEOUT = int(os.getenv("WEBHOOK_TIMEOUT", "30"))
+WEBHOOK_RETRIES = int(os.getenv("WEBHOOK_RETRIES", "3"))
+
+# ✅ SECURITY: Validate critical environment variables
 if not LIVEKIT_URL:
     log.warning("LIVEKIT_URL não definido no arquivo .env.local")
 if not LIVEKIT_API_KEY or not LIVEKIT_API_SECRET:
     log.warning("LIVEKIT_API_KEY ou LIVEKIT_API_SECRET não definidos no arquivo .env.local")
+if not MAKE_WEBHOOK_URL:
+    log.warning("MAKE_WEBHOOK_URL não definido no arquivo .env.local - transcripts não serão enviados")
+if not SIP_TRUNK_ID or SIP_TRUNK_ID == "ST_SSjcbMkbf6nB":
+    log.warning("⚠️  Using default SIP_TRUNK_ID - configure SIP_TRUNK_ID in .env.local for production")
+if not CALLER_ID or CALLER_ID == "+351210607606":
+    log.warning("⚠️  Using default CALLER_ID - configure CALLER_ID in .env.local for production")
 
 # ─────────────────────── Embedded Prompt Definitions ───────────────────────
 # Common prompt definitions
@@ -248,11 +265,160 @@ async def get_initial_greeting(metadata: Dict[str, Any]) -> str:
     else:
         return await build_common_greeting(metadata)
 
+# ─────────────────────── Webhook Functions ───────────────────────
+def hash_sensitive_data(data: str) -> str:
+    """Hash sensitive data for privacy protection"""
+    if not data or data in ["unknown", "Website User"]:
+        return data
+    return hashlib.sha256(data.encode()).hexdigest()[:16]  # First 16 chars for brevity
+
+async def send_transcript_webhook(
+    call_metadata: Dict[str, Any], 
+    transcript_data: Dict[str, Any],
+    session_start_time: datetime,
+    session_end_time: datetime
+) -> bool:
+    """
+    Send the complete call transcript to Make.com webhook
+    
+    Args:
+        call_metadata: Information about the call (persona, phone, etc.)
+        transcript_data: Complete conversation history from session.history
+        session_start_time: When the session started
+        session_end_time: When the session ended
+    
+    Returns:
+        bool: True if webhook sent successfully, False otherwise
+    """
+    if not MAKE_WEBHOOK_URL:
+        log.warning("MAKE_WEBHOOK_URL não configurado - transcript não enviado")
+        return False
+    
+    try:
+        # Calculate call duration
+        duration_seconds = int((session_end_time - session_start_time).total_seconds())
+        
+        # ✅ SECURITY: Hash sensitive data for privacy
+        phone_hash = hash_sensitive_data(call_metadata.get("phone_number", "unknown"))
+        customer_hash = hash_sensitive_data(call_metadata.get("customer_name", "Website User"))
+        
+        # Build the webhook payload with privacy protection
+        payload = {
+            "call_metadata": {
+                "call_id": call_metadata.get("call_id", "unknown"),
+                "room_name": call_metadata.get("room_name", "unknown"),
+                "persona": call_metadata.get("persona", "default"),
+                "phone_hash": phone_hash,  # ✅ Hashed instead of plain text
+                "customer_hash": customer_hash,  # ✅ Hashed instead of plain text
+                "start_time": session_start_time.isoformat(),
+                "end_time": session_end_time.isoformat(),
+                "duration_seconds": duration_seconds,
+                "call_outcome": "completed"  # We can expand this later
+            },
+            "transcript": {
+                "full_conversation": transcript_data,
+                "conversation_items": transcript_data.get("items", []),
+                "total_items": len(transcript_data.get("items", [])),
+            },
+            "analytics": {
+                "total_turns": len(transcript_data.get("items", [])),
+                "timestamp_utc": session_end_time.isoformat()
+            },
+            "technical": {
+                "agent_version": "1.0",
+                "model_used": "gpt-4o-realtime-preview",
+                "livekit_session": True
+            }
+        }
+        
+        # Prepare headers
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "ChamadaAI-Agent/1.0"
+        }
+        
+        # ✅ SECURITY: Improved authentication
+        if MAKE_WEBHOOK_SECRET:
+            # Use proper Bearer token format
+            headers["Authorization"] = f"Bearer {MAKE_WEBHOOK_SECRET}"
+            # Add timestamp for replay attack prevention
+            headers["X-Timestamp"] = str(int(session_end_time.timestamp()))
+        
+        # Send webhook with retries
+        for attempt in range(WEBHOOK_RETRIES):
+            try:
+                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=WEBHOOK_TIMEOUT)) as session:
+                    log.info(f"📤 Enviando transcript para webhook (tentativa {attempt + 1}/{WEBHOOK_RETRIES})")
+                    
+                    async with session.post(MAKE_WEBHOOK_URL, json=payload, headers=headers) as response:
+                        if response.status == 200:
+                            log.info(f"✅ Transcript enviado com sucesso - Status: {response.status}")
+                            return True
+                        else:
+                            log.warning(f"❌ Webhook falhou com status {response.status}")
+                            
+            except asyncio.TimeoutError:
+                log.warning(f"⏰ Timeout na tentativa {attempt + 1} - webhook demorou mais de {WEBHOOK_TIMEOUT}s")
+            except aiohttp.ClientError as e:
+                log.warning(f"🔌 Erro de conexão na tentativa {attempt + 1}: {type(e).__name__}")
+            except Exception as e:
+                log.error(f"💥 Erro inesperado na tentativa {attempt + 1}: {type(e).__name__}")
+            
+            # Wait before retry (exponential backoff)
+            if attempt < WEBHOOK_RETRIES - 1:
+                wait_time = 2 ** attempt  # 1s, 2s, 4s
+                log.info(f"⏳ Aguardando {wait_time}s antes da próxima tentativa...")
+                await asyncio.sleep(wait_time)
+        
+        log.error(f"❌ Falha ao enviar transcript após {WEBHOOK_RETRIES} tentativas")
+        return False
+        
+    except Exception as e:
+        log.error(f"💥 Erro crítico ao preparar webhook: {type(e).__name__}", exc_info=True)
+        return False
+
+async def save_transcript_to_webhook(
+    session: AgentSession,
+    call_metadata: Dict[str, Any],
+    session_start_time: datetime
+) -> None:
+    """
+    Extract transcript from session history and send to webhook
+    This function is called as a shutdown callback when the call ends
+    """
+    try:
+        session_end_time = datetime.now(ZoneInfo("Europe/Lisbon"))
+        
+        # Get the complete conversation history
+        log.info("📋 Extraindo transcript da sessão...")
+        transcript_data = session.history.to_dict()
+        
+        log.info(f"✅ Transcript extraído: {len(transcript_data.get('items', []))} itens de conversa")
+        # ✅ SECURITY FIX: Remove detailed logging of conversation content
+        # log.debug(f"Transcript completo: {json.dumps(transcript_data, indent=2, default=str)}")
+        
+        # Send to webhook
+        success = await send_transcript_webhook(
+            call_metadata=call_metadata,
+            transcript_data=transcript_data,
+            session_start_time=session_start_time,
+            session_end_time=session_end_time
+        )
+        
+        if success:
+            log.info("🎉 Transcript enviado com sucesso para Make.com!")
+        else:
+            log.error("💔 Falha ao enviar transcript para Make.com")
+            
+    except Exception as e:
+        log.error(f"💥 Erro crítico ao salvar transcript: {type(e).__name__}", exc_info=True)
+
 # ─────────────────────── Entrypoint LiveKit ───────────────────────
 async def entrypoint(ctx: JobContext):
     """Ponto de entrada principal do agente adaptável para diferentes personas"""
     try:
         log.info(f"Received job: id={ctx.job.id}, room={ctx.room.name}")
+        session_start_time = datetime.now(ZoneInfo("Europe/Lisbon"))
 
         # Extract metadata
         try:
@@ -264,12 +430,22 @@ async def entrypoint(ctx: JobContext):
 
         # Extract persona and customer information
         persona = metadata.get("persona", "default")
-        phone_number = metadata.get("phone_number", "+351933792547")  # Include fallback
+        phone_number = metadata.get("phone_number", DEFAULT_FALLBACK_PHONE)  # Use default fallback
         customer_name = metadata.get("customer_name", "Website User")
         
-        log.info(f"Using persona: {persona}")
-        log.info(f"Phone number: {phone_number}")
-        log.info(f"Customer name: {customer_name}")
+        # ✅ SECURITY: Log without sensitive data
+        log.info(f"Processing call for persona: {persona}")
+        log.info(f"Customer identifier: {hash_sensitive_data(customer_name)}")
+
+        # Prepare call metadata for webhook
+        call_metadata = {
+            "call_id": ctx.job.id,
+            "room_name": ctx.room.name,
+            "persona": persona,
+            "phone_number": phone_number,
+            "customer_name": customer_name,
+            "job_metadata": metadata
+        }
 
         # Configure realtime model
         log.debug("Configuring realtime model")
@@ -289,6 +465,13 @@ async def entrypoint(ctx: JobContext):
         system_prompt = await get_system_prompt(metadata)
         agent = Agent(instructions=system_prompt)
         session = AgentSession(llm=realtime_model)
+
+        # 📋 ADD TRANSCRIPT WEBHOOK CALLBACK
+        log.info("🔗 Configurando callback para envio de transcript...")
+        ctx.add_shutdown_callback(
+            lambda: save_transcript_to_webhook(session, call_metadata, session_start_time)
+        )
+        log.info("✅ Callback de transcript configurado - será executado ao final da chamada")
 
         # 1. First, connect to LiveKit room
         log.debug("Connecting to room")
@@ -332,6 +515,7 @@ async def entrypoint(ctx: JobContext):
         )
         
         log.info("Initial greeting sent, waiting for client response")
+        log.info("📋 Transcript será automaticamente capturado e enviado para webhook ao final da chamada")
 
     except Exception as e:
         log.error(f"Erro fatal no entrypoint: {str(e)}", exc_info=True)

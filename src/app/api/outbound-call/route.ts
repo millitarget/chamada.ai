@@ -82,90 +82,24 @@ async function checkRateLimit(ipAddress: string): Promise<[boolean, number]> {
   }
 }
 
+/**
+ * DEPRECATED: This endpoint is deprecated for security reasons.
+ * Use /api/start_call instead which provides better security and routing.
+ */
 export async function POST(request: NextRequest) {
-  try {
-    // Get client IP address
-    const ipAddress = request.headers.get('x-forwarded-for') || 
-                      request.headers.get('x-real-ip') || 
-                      '127.0.0.1';
-    
-    // Check if rate limiting is enabled (Supabase is configured)
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const rateLimit = supabaseUrl && supabaseAnonKey;
-    
-    // Only check rate limit if Supabase is configured
-    if (rateLimit) {
-      // Check if IP is rate limited
-      const [isLimited, remainingSeconds] = await checkRateLimit(ipAddress.split(',')[0]);
-      
-      if (isLimited) {
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: 'Rate limit exceeded', 
-            retryAfter: Math.ceil(remainingSeconds / 60) // Convert to minutes for user-friendly message
-          },
-          { status: 429 }
-        );
-      }
-    } else {
-      console.log('Rate limiting disabled - Supabase not configured');
-    }
-    
-    // Parse the request body
-    const body = await request.json();
-    
-    // Ensure phone number has the +351 prefix
-    let phoneNumber = body.phone || '';
-    const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
-    
-    const formattedNumber = cleanNumber.startsWith('351') 
-      ? `+${cleanNumber}` 
-      : `+351${cleanNumber}`;
-    
-    // Make a request to ElevenLabs API
-    const response = await fetch('https://api.us.elevenlabs.io/v1/convai/twilio/outbound_call', {
-      method: 'POST',
-      headers: {
-        'xi-api-key': process.env.ELEVENLABS_API_KEY || 'sk_d94f2950348df3ba0e76092bbcf1e9d51fa5fe66c8904317',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        'agent_id': process.env.ELEVEN_AGENT_ID || 'tLYQ1n0EtQQHx8lqbcPT',
-        'agent_phone_number_id': process.env.ELEVEN_AGENT_PHONE_NUMBER_ID || 'EcZm7zeCaXukBOPwwwSN',
-        'to_number': formattedNumber
-      })
-    });
-    
-    // Get the response data
-    let data;
-    try {
-      data = await response.json();
-    } catch (error) {
-      // If JSON parsing fails, return a text response
-      const text = await response.text();
-      return NextResponse.json(
-        { success: false, error: 'Failed to parse response', text },
-        { status: 500 }
-      );
-    }
-    
-    // Return the response from ElevenLabs
-    if (!response.ok) {
-      return NextResponse.json(
-        { success: false, error: data.error || 'API call failed' },
-        { status: response.status }
-      );
-    }
-    
-    return NextResponse.json({ success: true, data });
-    
-  } catch (error) {
-    console.error('Error in outbound-call API route:', error);
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
-  }
+  console.warn('DEPRECATED: /api/outbound-call endpoint called. Use /api/start_call instead.');
+  
+  return NextResponse.json({
+    success: false,
+    error: 'This endpoint is deprecated',
+    message: 'Please use /api/start_call instead for better security and functionality.',
+    redirect: '/api/start_call'
+  }, { status: 410 }); // 410 Gone - indicates the resource is no longer available
+}
+
+export async function GET(request: NextRequest) {
+  return NextResponse.json({
+    message: 'This endpoint is deprecated. Use /api/start_call for call requests.',
+    documentation: 'See SECURITY_ENVIRONMENT.md for proper usage.'
+  }, { status: 410 });
 } 
