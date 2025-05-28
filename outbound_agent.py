@@ -14,6 +14,8 @@ from livekit.plugins import openai
 from openai.types.beta.realtime.session import TurnDetection
 from zoneinfo import ZoneInfo
 import hashlib
+from collections import defaultdict
+import time
 
 # ─────────────────────── Configuração inicial ───────────────────────
 load_dotenv(".env.local")
@@ -392,18 +394,109 @@ def hash_sensitive_data(data: str) -> str:
         return data
     return hashlib.sha256(data.encode()).hexdigest()[:16]  # First 16 chars for brevity
 
+def format_transcript_from_session_history(session_history: Dict[str, Any]) -> str:
+    """
+    Convert LiveKit session history into a clean, readable transcript string.
+    Based on official LiveKit documentation for OpenAI Realtime API.
+
+    Args:
+        session_history: The session.history.to_dict() output from LiveKit AgentSession
+
+    Returns:
+        A formatted transcript string with the complete conversation
+    """
+    try:
+        log.info("🔍 Extracting transcript from LiveKit session history")
+        
+        # According to LiveKit docs, session.history.to_dict() contains conversation items
+        # The structure follows the OpenAI Realtime API conversation format
+        items = session_history.get("items", [])
+        
+        if not items:
+            log.warning("❌ No conversation items found in session_history")
+            log.debug(f"Session history structure: {list(session_history.keys())}")
+            return "No conversation found."
+        
+        log.info(f"📝 Found {len(items)} conversation items")
+        
+        transcript_lines = []
+        transcript_lines.append("=== CONVERSATION TRANSCRIPT ===")
+        transcript_lines.append("")
+        
+        for i, item in enumerate(items):
+            try:
+                # Each item should have a role and content according to OpenAI Realtime API
+                role = item.get("role", "unknown")
+                content = item.get("content", [])
+                
+                # Handle different content formats
+                if isinstance(content, str):
+                    # Simple string content
+                    text_content = content
+                elif isinstance(content, list):
+                    # List of content objects (OpenAI format)
+                    text_parts = []
+                    for content_item in content:
+                        if isinstance(content_item, dict):
+                            if content_item.get("type") == "text":
+                                text_parts.append(content_item.get("text", ""))
+                            elif "text" in content_item:
+                                text_parts.append(content_item["text"])
+                        elif isinstance(content_item, str):
+                            text_parts.append(content_item)
+                    text_content = " ".join(text_parts)
+                else:
+                    # Fallback for other formats
+                    text_content = str(content)
+                
+                # Clean up the text content
+                text_content = text_content.strip()
+                
+                if text_content:
+                    # Format based on role
+                    if role == "user":
+                        speaker = "👤 User"
+                    elif role == "assistant":
+                        speaker = "🤖 Assistant"
+                    elif role == "system":
+                        speaker = "⚙️ System"
+                    else:
+                        speaker = f"❓ {role.title()}"
+                    
+                    transcript_lines.append(f"{speaker}: {text_content}")
+                    transcript_lines.append("")
+                
+            except Exception as item_error:
+                log.warning(f"⚠️ Error processing conversation item {i}: {item_error}")
+                continue
+        
+        if len(transcript_lines) <= 2:  # Only header lines
+            log.warning("❌ No valid conversation content found")
+            return "No valid conversation content found."
+        
+        transcript = "\n".join(transcript_lines)
+        log.info(f"✅ Successfully formatted transcript with {len(transcript_lines)} lines")
+        
+        return transcript
+        
+    except Exception as e:
+        log.error(f"❌ Error formatting transcript: {e}")
+        log.debug(f"Session history type: {type(session_history)}")
+        log.debug(f"Session history keys: {list(session_history.keys()) if isinstance(session_history, dict) else 'Not a dict'}")
+        return f"Error formatting transcript: {str(e)}"
+
 async def send_transcript_webhook(
     call_metadata: Dict[str, Any], 
-    transcript_data: Dict[str, Any],
+    formatted_transcript: str,
     session_start_time: datetime,
     session_end_time: datetime
 ) -> bool:
     """
-    Send the complete call transcript to Make.com webhook
+    Send a single, clean webhook request with consolidated transcript.
     
     Args:
         call_metadata: Information about the call (persona, phone, etc.)
-        transcript_data: Complete conversation history from session.history
+        formatted_transcript: Clean, formatted transcript string
         session_start_time: When the session started
         session_end_time: When the session ended
     
@@ -411,7 +504,7 @@ async def send_transcript_webhook(
         bool: True if webhook sent successfully, False otherwise
     """
     if not MAKE_WEBHOOK_URL:
-        log.warning("MAKE_WEBHOOK_URL não configurado - transcript não enviado")
+        log.warning("MAKE_WEBHOOK_URL not configured - transcript not sent")
         return False
     
     try:
@@ -422,80 +515,131 @@ async def send_transcript_webhook(
         phone_hash = hash_sensitive_data(call_metadata.get("phone_number", "unknown"))
         customer_hash = hash_sensitive_data(call_metadata.get("customer_name", "Website User"))
         
-        # Build the webhook payload with privacy protection
+        # Analyze transcript for better analytics
+        transcript_lines = [line for line in formatted_transcript.split('\n') if line.strip()]
+        agent_messages = len([line for line in transcript_lines if line.startswith('Agente:')])
+        client_messages = len([line for line in transcript_lines if line.startswith('Cliente:')])
+        total_messages = len(transcript_lines)
+        
+        # Determine call outcome based on transcript content
+        call_outcome = "completed"
+        if "erro" in formatted_transcript.lower() or "falha" in formatted_transcript.lower():
+            call_outcome = "error"
+        elif total_messages < 2:
+            call_outcome = "no_conversation"
+        elif agent_messages == 0 or client_messages == 0:
+            call_outcome = "one_sided"
+        
+        # Build comprehensive webhook payload
         payload = {
             "call_metadata": {
                 "call_id": call_metadata.get("call_id", "unknown"),
                 "room_name": call_metadata.get("room_name", "unknown"),
                 "persona": call_metadata.get("persona", "default"),
-                "phone_hash": phone_hash,  # ✅ Hashed instead of plain text
-                "customer_hash": customer_hash,  # ✅ Hashed instead of plain text
+                "phone_hash": phone_hash,
+                "customer_hash": customer_hash,
                 "start_time": session_start_time.isoformat(),
                 "end_time": session_end_time.isoformat(),
                 "duration_seconds": duration_seconds,
-                "call_outcome": "completed"  # We can expand this later
+                "call_outcome": call_outcome
             },
             "transcript": {
-                "full_conversation": transcript_data,
-                "conversation_items": transcript_data.get("items", []),
-                "total_items": len(transcript_data.get("items", [])),
+                "content": formatted_transcript,  # ✅ Single consolidated transcript
+                "format": "text",
+                "language": "pt-PT",
+                "encoding": "utf-8"
             },
             "analytics": {
-                "total_turns": len(transcript_data.get("items", [])),
+                "total_messages": total_messages,
+                "agent_messages": agent_messages,
+                "client_messages": client_messages,
+                "conversation_turns": max(agent_messages, client_messages),
+                "avg_message_length": len(formatted_transcript) // max(total_messages, 1),
                 "timestamp_utc": session_end_time.isoformat()
             },
             "technical": {
                 "agent_version": "1.0",
-                "model_used": "gpt-4o-realtime-preview",
-                "livekit_session": True
+                "model_used": "gpt-4o-mini-realtime-preview",
+                "livekit_session": True,
+                "webhook_version": "2.0"
             }
         }
         
         # Prepare headers
         headers = {
             "Content-Type": "application/json",
-            "User-Agent": "ChamadaAI-Agent/1.0"
+            "User-Agent": "ChamadaAI-Agent/1.0",
+            "X-Webhook-Version": "2.0"
         }
         
-        # ✅ SECURITY: Improved authentication
+        # ✅ SECURITY: Authentication if configured
         if MAKE_WEBHOOK_SECRET:
-            # Use proper Bearer token format
             headers["Authorization"] = f"Bearer {MAKE_WEBHOOK_SECRET}"
-            # Add timestamp for replay attack prevention
             headers["X-Timestamp"] = str(int(session_end_time.timestamp()))
         
-        # Send webhook with retries
+        # Send webhook with retries and exponential backoff
         for attempt in range(WEBHOOK_RETRIES):
             try:
-                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=WEBHOOK_TIMEOUT)) as session:
-                    log.info(f"📤 Enviando transcript para webhook (tentativa {attempt + 1}/{WEBHOOK_RETRIES})")
+                timeout = aiohttp.ClientTimeout(total=WEBHOOK_TIMEOUT)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    log.info(f"📤 Sending consolidated transcript to webhook (attempt {attempt + 1}/{WEBHOOK_RETRIES})")
+                    log.info(f"📊 Transcript: {total_messages} messages ({agent_messages} agent, {client_messages} client)")
                     
                     async with session.post(MAKE_WEBHOOK_URL, json=payload, headers=headers) as response:
                         if response.status == 200:
-                            log.info(f"✅ Transcript enviado com sucesso - Status: {response.status}")
-                            return True
+                            log.info(f"✅ Transcript sent successfully - Status: {response.status}")
+                            return True  # ✅ Success - stop retrying
                         else:
-                            log.warning(f"❌ Webhook falhou com status {response.status}")
+                            response_text = await response.text()
+                            log.warning(f"❌ Webhook failed with status {response.status}: {response_text}")
+                            
+                            # Don't retry on client errors (4xx)
+                            if 400 <= response.status < 500:
+                                log.error(f"🚫 Client error {response.status} - not retrying")
+                                return False
                             
             except asyncio.TimeoutError:
-                log.warning(f"⏰ Timeout na tentativa {attempt + 1} - webhook demorou mais de {WEBHOOK_TIMEOUT}s")
+                log.warning(f"⏰ Timeout on attempt {attempt + 1} - webhook took longer than {WEBHOOK_TIMEOUT}s")
             except aiohttp.ClientError as e:
-                log.warning(f"🔌 Erro de conexão na tentativa {attempt + 1}: {type(e).__name__}")
+                log.warning(f"🔌 Connection error on attempt {attempt + 1}: {type(e).__name__}")
             except Exception as e:
-                log.error(f"💥 Erro inesperado na tentativa {attempt + 1}: {type(e).__name__}")
+                log.error(f"💥 Unexpected error on attempt {attempt + 1}: {type(e).__name__}")
             
-            # Wait before retry (exponential backoff)
+            # Wait before retry with exponential backoff
             if attempt < WEBHOOK_RETRIES - 1:
-                wait_time = 2 ** attempt  # 1s, 2s, 4s
-                log.info(f"⏳ Aguardando {wait_time}s antes da próxima tentativa...")
+                wait_time = min(2 ** attempt, 10)  # Cap at 10 seconds
+                log.info(f"⏳ Waiting {wait_time}s before next attempt...")
                 await asyncio.sleep(wait_time)
         
-        log.error(f"❌ Falha ao enviar transcript após {WEBHOOK_RETRIES} tentativas")
+        log.error(f"❌ Failed to send transcript after {WEBHOOK_RETRIES} attempts")
         return False
         
     except Exception as e:
-        log.error(f"💥 Erro crítico ao preparar webhook: {type(e).__name__}", exc_info=True)
+        log.error(f"💥 Critical error preparing webhook: {type(e).__name__}", exc_info=True)
         return False
+
+# ─────────────────────── Global state for preventing duplicate webhooks ───────────────────────
+# Use a dict with timestamps for automatic cleanup
+_webhook_sent_jobs = defaultdict(float)  # job_id -> timestamp
+_CLEANUP_INTERVAL = 3600  # Clean up entries older than 1 hour
+_last_cleanup = time.time()
+
+def _cleanup_old_webhook_jobs():
+    """Clean up old job IDs to prevent memory leaks"""
+    global _webhook_sent_jobs, _last_cleanup
+    
+    current_time = time.time()
+    if current_time - _last_cleanup > _CLEANUP_INTERVAL:
+        cutoff_time = current_time - _CLEANUP_INTERVAL
+        old_jobs = [job_id for job_id, timestamp in _webhook_sent_jobs.items() if timestamp < cutoff_time]
+        
+        for job_id in old_jobs:
+            del _webhook_sent_jobs[job_id]
+        
+        if old_jobs:
+            log.info(f"🧹 Cleaned up {len(old_jobs)} old webhook job entries")
+        
+        _last_cleanup = current_time
 
 async def save_transcript_to_webhook(
     session: AgentSession,
@@ -503,35 +647,87 @@ async def save_transcript_to_webhook(
     session_start_time: datetime
 ) -> None:
     """
-    Extract transcript from session history and send to webhook
-    This function is called as a shutdown callback when the call ends
+    Extract transcript from session history, format it cleanly, and send ONE webhook request.
+    This function is called as a shutdown callback when the call ends.
     """
+    global _webhook_sent_jobs
+    
+    job_id = call_metadata.get("call_id", "unknown")
+    
+    # Clean up old entries periodically
+    _cleanup_old_webhook_jobs()
+    
+    # ✅ PREVENT DUPLICATE WEBHOOKS
+    if job_id in _webhook_sent_jobs:
+        log.warning(f"🚫 Webhook already sent for job {job_id} - ignoring duplicate call")
+        return
+    
+    # Mark as processing immediately to prevent race conditions
+    _webhook_sent_jobs[job_id] = time.time()
+    
     try:
         session_end_time = datetime.now(ZoneInfo("Europe/Lisbon"))
         
         # Get the complete conversation history
-        log.info("📋 Extraindo transcript da sessão...")
-        transcript_data = session.history.to_dict()
+        log.info("📋 Extracting and formatting transcript from session...")
         
-        log.info(f"✅ Transcript extraído: {len(transcript_data.get('items', []))} itens de conversa")
-        # ✅ SECURITY FIX: Remove detailed logging of conversation content
-        # log.debug(f"Transcript completo: {json.dumps(transcript_data, indent=2, default=str)}")
-        
-        # Send to webhook
-        success = await send_transcript_webhook(
-            call_metadata=call_metadata,
-            transcript_data=transcript_data,
-            session_start_time=session_start_time,
-            session_end_time=session_end_time
-        )
-        
-        if success:
-            log.info("🎉 Transcript enviado com sucesso para Make.com!")
+        # ✅ SAFETY: Check if session is still valid
+        if not session or not hasattr(session, 'history'):
+            log.warning("⚠️ Session or session.history is not available")
+            formatted_transcript = "Agente: [Sessão não disponível para extração de transcript]"
         else:
-            log.error("💔 Falha ao enviar transcript para Make.com")
-            
+            try:
+                session_history = session.history.to_dict()
+                
+                # Add comprehensive debugging to understand the structure
+                log.info(f"🔍 Session history type: {type(session_history)}")
+                log.info(f"🔍 Session history keys: {list(session_history.keys()) if isinstance(session_history, dict) else 'Not a dict'}")
+                
+                # Log the full structure for debugging (first few items only to avoid spam)
+                if isinstance(session_history, dict):
+                    for key, value in session_history.items():
+                        if isinstance(value, list):
+                            log.info(f"🔍 Key '{key}' contains list with {len(value)} items")
+                            if value:  # If list is not empty, show first item structure
+                                log.info(f"🔍 First item in '{key}': {type(value[0])} - {value[0] if len(str(value[0])) < 200 else str(value[0])[:200] + '...'}")
+                        else:
+                            log.info(f"🔍 Key '{key}': {type(value)} - {value if len(str(value)) < 100 else str(value)[:100] + '...'}")
+                
+                # Extract and format the transcript
+                formatted_transcript = format_transcript_from_session_history(session_history)
+                
+                if not formatted_transcript or formatted_transcript.startswith("Error") or formatted_transcript.startswith("No"):
+                    log.warning(f"⚠️ Transcript extraction failed: {formatted_transcript}")
+                    # Don't send webhook if transcript is empty or error
+                    return
+                
+                log.info(f"📝 Transcript extracted successfully: {len(formatted_transcript)} characters")
+                
+                # Send the webhook with the transcript
+                webhook_success = await send_transcript_webhook(
+                    call_metadata=call_metadata,
+                    formatted_transcript=formatted_transcript,
+                    session_start_time=session_start_time,
+                    session_end_time=session_end_time
+                )
+                
+                if webhook_success:
+                    log.info("✅ Transcript webhook sent successfully")
+                else:
+                    log.error("❌ Failed to send transcript webhook")
+                
+            except Exception as history_error:
+                log.error(f"❌ Error accessing session history: {history_error}")
+                formatted_transcript = f"Agente: [Erro ao acessar histórico da sessão: {str(history_error)}]"
+        
+        log.info(f"✅ Transcript formatted with {len(formatted_transcript.split())} words")
+        log.info(f"📝 Complete transcript: {formatted_transcript}")
+        
     except Exception as e:
-        log.error(f"💥 Erro crítico ao salvar transcript: {type(e).__name__}", exc_info=True)
+        log.error(f"💥 Critical error saving transcript: {type(e).__name__}", exc_info=True)
+    finally:
+        # Keep the job ID marked as processed (will be cleaned up automatically after 1 hour)
+        pass
 
 # ─────────────────────── Entrypoint LiveKit ───────────────────────
 async def entrypoint(ctx: JobContext):
@@ -582,7 +778,7 @@ async def entrypoint(ctx: JobContext):
         realtime_model = openai.realtime.RealtimeModel(
             model="gpt-4o-mini-realtime-preview-2024-12-17",
             voice=selected_voice,  # Gender-appropriate voice
-            temperature=0.85,  # Lower temperature for more consistent language style
+            temperature=0.9,  # Lower temperature for more consistent language style
             turn_detection=TurnDetection(
                 type="semantic_vad",
                 eagerness="auto",
