@@ -37,7 +37,7 @@ LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY")
 LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET")
 
 # Webhook configuration
-MAKE_WEBHOOK_URL = os.getenv("MAKE_WEBHOOK_URL")
+MAKE_WEBHOOK_URL = "https://hook.eu2.make.com/3piew3wpiu0jtewr1tlb66r6e8medd9r"  # Hardcoded after-call webhook
 MAKE_WEBHOOK_SECRET = os.getenv("MAKE_WEBHOOK_SECRET")  # Optional for verification
 WEBHOOK_TIMEOUT = int(os.getenv("WEBHOOK_TIMEOUT", "30"))
 WEBHOOK_RETRIES = int(os.getenv("WEBHOOK_RETRIES", "3"))
